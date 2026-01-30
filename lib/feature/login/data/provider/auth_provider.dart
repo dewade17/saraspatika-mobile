@@ -126,6 +126,13 @@ class AuthProvider extends ChangeNotifier {
 
       if (res is Map<String, dynamic>) {
         _me = PrivateUserData.fromJson(res);
+        try {
+          await _api.savePermissions(_me!.permissions);
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('Failed to persist permissions: $e');
+          }
+        }
         notifyListeners();
         return _me;
       }
@@ -135,6 +142,13 @@ class AuthProvider extends ChangeNotifier {
           res.map((k, v) => MapEntry(k.toString(), v)),
         );
         _me = PrivateUserData.fromJson(map);
+        try {
+          await _api.savePermissions(_me!.permissions);
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('Failed to persist permissions: $e');
+          }
+        }
         notifyListeners();
         return _me;
       }
@@ -154,7 +168,7 @@ class AuthProvider extends ChangeNotifier {
       _token = null;
       _me = null;
       _errorMessage = null;
-      await _api.clearToken();
+      await _api.clearAuthData();
       notifyListeners();
     } finally {
       _setLoading(false);

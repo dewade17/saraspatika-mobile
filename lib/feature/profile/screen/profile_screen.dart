@@ -1,6 +1,3 @@
-import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:saraspatika/core/constants/colors.dart';
 
@@ -12,41 +9,23 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // Dummy user (UI-only)
-  final _ProfileUserUiModel _user = const _ProfileUserUiModel(
-    nama: 'I Putu Hendy Pradika, S.Pd',
-    email: 'hendy@example.com',
-    noHp: '',
-    nip: '',
-    // isi base64 image kalau mau test (boleh dengan prefix data:image/...;base64,)
-    fotoProfil: '',
-  );
-
   Future<void> _fakeRefresh() async {
-    // UI-only refresh palsu
     await Future<void>.delayed(const Duration(milliseconds: 700));
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
-  Uint8List? _tryDecodeBase64Image(String? value) {
-    if (value == null) return null;
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) return null;
-
-    final isBase64Image = trimmed.startsWith('data:image');
-    if (!isBase64Image) return null;
-
-    try {
-      final cleaned = trimmed.split(',').last;
-      return base64Decode(cleaned);
-    } catch (_) {
-      return null;
-    }
+  void _showSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
-    final bytes = _tryDecodeBase64Image(_user.fotoProfil);
+    const String namaUser = 'I Putu Hendy Pradika, S.Pd';
+    const String emailUser = 'hendy@example.com';
+    const String noHpUser = '081234567890';
+    const String nipUser = '199201012024011001';
 
     return Scaffold(
       backgroundColor: AppColors.primaryColor.withOpacity(0.1),
@@ -54,6 +33,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         centerTitle: true,
         title: const Text('Profil'),
         backgroundColor: AppColors.primaryColor,
+        elevation: 0,
       ),
       body: RefreshIndicator(
         onRefresh: _fakeRefresh,
@@ -65,58 +45,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: CircleAvatar(
                   radius: 60,
                   backgroundColor: Colors.white,
-                  backgroundImage: bytes != null ? MemoryImage(bytes) : null,
-                  child: bytes == null
-                      ? const Icon(Icons.person, size: 60, color: Colors.grey)
-                      : null,
+                  child: Icon(
+                    Icons.person,
+                    size: 80,
+                    color: AppColors.primaryColor,
+                  ),
                 ),
               ),
-              const SizedBox(height: 20),
-
-              _buildSectionHeader("Informasi Pribadi"),
-              _buildInfoTile(Icons.person, _user.nama),
-              _buildInfoTile(Icons.email, _user.email),
-              _buildInfoTile(
-                Icons.phone,
-                (_user.noHp?.isNotEmpty == true)
-                    ? _user.noHp!
-                    : "Lengkapi nomor telepon",
-              ),
-              _buildInfoTile(
-                Icons.badge,
-                (_user.nip?.isNotEmpty == true)
-                    ? _user.nip!
-                    : "Lengkapi NIP Anda",
-              ),
-
               const SizedBox(height: 24),
-
+              _buildSectionHeader("Informasi Pribadi"),
+              _buildInfoTile(Icons.person, namaUser),
+              _buildInfoTile(Icons.email, emailUser),
+              _buildInfoTile(Icons.phone, noHpUser),
+              _buildInfoTile(Icons.badge, nipUser),
+              const SizedBox(height: 24),
               _buildSectionHeader("Pengaturan"),
               _buildActionTile(Icons.face, "Registrasi Wajah", () {
-                // UI-only placeholder
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Registrasi Wajah (UI dummy)')),
-                );
+                _showSnackBar(context, 'Registrasi Wajah (UI dummy)');
               }),
               _buildActionTile(Icons.warning, "Absensi Darurat", () {
-                // UI-only placeholder
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Absensi Darurat (UI dummy)')),
-                );
+                _showSnackBar(context, 'Absensi Darurat (UI dummy)');
               }),
-
               const SizedBox(height: 100),
             ],
           ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // UI-only placeholder
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Edit Profil (UI dummy)')),
-          );
-        },
+        onPressed: () => _showSnackBar(context, 'Edit Profil (UI dummy)'),
         backgroundColor: AppColors.primaryColor,
         child: const Icon(Icons.edit, color: Colors.white),
       ),
@@ -130,8 +86,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title.toUpperCase(),
         style: const TextStyle(
           fontWeight: FontWeight.bold,
-          fontSize: 14,
+          fontSize: 13,
           color: Colors.black54,
+          letterSpacing: 1.2,
         ),
       ),
     );
@@ -139,46 +96,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildInfoTile(IconData icon, String value) {
     return Card(
-      elevation: 2,
-      margin: const EdgeInsets.symmetric(vertical: 6),
+      elevation: 0.5,
+      margin: const EdgeInsets.symmetric(vertical: 4),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         leading: Icon(icon, color: AppColors.primaryColor),
-        title: Text(value),
+        title: Text(
+          value,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+        ),
       ),
     );
   }
 
   Widget _buildActionTile(IconData icon, String label, VoidCallback onTap) {
     return Card(
-      elevation: 2,
-      margin: const EdgeInsets.symmetric(vertical: 6),
+      elevation: 0.5,
+      margin: const EdgeInsets.symmetric(vertical: 4),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        leading: const Icon(Icons.settings, color: Colors.orange),
-        title: Text(label),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        leading: Icon(icon, color: Colors.orange),
+        title: Text(label, style: const TextStyle(fontSize: 15)),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          size: 14,
+          color: Colors.grey,
+        ),
         onTap: onTap,
       ),
     );
   }
-}
-
-// =====================
-// UI Model (Dummy)
-// =====================
-class _ProfileUserUiModel {
-  final String nama;
-  final String email;
-  final String? noHp;
-  final String? nip;
-  final String? fotoProfil; // base64 image optional
-
-  const _ProfileUserUiModel({
-    required this.nama,
-    required this.email,
-    this.noHp,
-    this.nip,
-    this.fotoProfil,
-  });
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:saraspatika/core/shared_widgets/permission_guard.dart';
 import 'package:saraspatika/feature/login/data/provider/auth_provider.dart';
 
 class ButtonAppBar extends StatefulWidget {
@@ -10,14 +11,24 @@ class ButtonAppBar extends StatefulWidget {
 }
 
 class _ButtonAppBarState extends State<ButtonAppBar> {
-  final bool _isProfileComplete = true;
-
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final userRole = authProvider.me?.role.toUpperCase() ?? '';
+    final bool isKerja = userRole == 'PEGAWAI';
+    final IconData menuIcon = isKerja
+        ? Icons.business_center
+        : Icons.assignment_add;
+    final String menuTitle = isKerja ? 'Agenda\nKerja' : 'Agenda\nMengajar';
+    final String routeName = isKerja
+        ? '/screen-agenda-kerja'
+        : '/screen-agenda-mengajar';
+    final bool isProfileComplete = authProvider.me != null;
+
     return Column(
       children: [
         Card(
-          child: _isProfileComplete
+          child: isProfileComplete
               ? Column(
                   children: [
                     const SizedBox(height: 10),
@@ -25,26 +36,30 @@ class _ButtonAppBarState extends State<ButtonAppBar> {
                       padding: const EdgeInsets.all(4),
                       child: Row(
                         children: [
-                          Expanded(
-                            child: InkWell(
-                              onTap: () {
-                                // UI-only: placeholder route
-                                Navigator.pushNamed(
+                          PermissionGuard(
+                            resource: 'absensi',
+                            action: 'create',
+                            child: Expanded(
+                              child: InkWell(
+                                onTap: () => Navigator.pushNamed(
                                   context,
                                   '/absensi-kedatangan',
-                                );
-                              },
-                              child: const Center(
-                                child: Column(
+                                ),
+                                child: const Column(
                                   children: [
                                     Icon(
                                       Icons.calendar_month,
                                       size: 30,
                                       color: Color(0xFF92E3A9),
                                     ),
+                                    SizedBox(height: 4),
                                     Text(
                                       'Absensi Kedatangan',
                                       textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -52,49 +67,58 @@ class _ButtonAppBarState extends State<ButtonAppBar> {
                             ),
                           ),
                           const SizedBox(width: 10),
-                          Expanded(
-                            child: InkWell(
-                              onTap: () {
-                                // UI-only: placeholder route
-                                Navigator.pushNamed(
+                          PermissionGuard(
+                            resource: 'absensi',
+                            action: 'create',
+                            child: Expanded(
+                              child: InkWell(
+                                onTap: () => Navigator.pushNamed(
                                   context,
                                   '/absensi-kepulangan',
-                                );
-                              },
-                              child: const Center(
-                                child: Column(
+                                ),
+                                child: const Column(
                                   children: [
                                     Icon(
                                       Icons.calendar_month,
                                       size: 30,
                                       color: Colors.red,
                                     ),
+                                    SizedBox(height: 4),
                                     Text(
                                       'Absensi Kepulangan',
                                       textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
                             ),
                           ),
-                          Expanded(
-                            child: InkWell(
-                              onTap: () {
-                                // UI-only: placeholder route
-                                Navigator.pushNamed(context, '/screen-agenda');
-                              },
-                              child: const Center(
+                          PermissionGuard(
+                            resource: 'agenda',
+                            action: 'read',
+                            child: Expanded(
+                              child: InkWell(
+                                onTap: () =>
+                                    Navigator.pushNamed(context, routeName),
                                 child: Column(
                                   children: [
                                     Icon(
-                                      Icons.assignment_add,
+                                      menuIcon,
                                       size: 30,
                                       color: Colors.blueAccent,
                                     ),
+                                    const SizedBox(height: 4),
                                     Text(
-                                      'Agenda\nMengajar',
+                                      menuTitle,
                                       textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -104,29 +128,30 @@ class _ButtonAppBarState extends State<ButtonAppBar> {
                           Expanded(
                             child: InkWell(
                               onTap: () async {
-                                final authProvider = Provider.of<AuthProvider>(
-                                  context,
-                                  listen: false,
-                                );
-
                                 await authProvider.logout();
-                                if (!mounted) return;
-
+                                if (!context.mounted) return;
                                 Navigator.of(context).pushNamedAndRemoveUntil(
                                   '/login',
                                   (route) => false,
                                 );
                               },
-                              child: const Center(
-                                child: Column(
-                                  children: [
-                                    Icon(
-                                      Icons.power_settings_new_sharp,
-                                      size: 30,
+                              child: const Column(
+                                children: [
+                                  Icon(
+                                    Icons.power_settings_new_sharp,
+                                    size: 30,
+                                    color: Colors.grey,
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'Logout',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
                                     ),
-                                    Text('Logout'),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),

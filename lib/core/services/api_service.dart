@@ -87,6 +87,8 @@ class ApiService {
 
   static const String _tokenKey = 'token';
 
+  static const String _permissionsKey = 'permissions';
+
   http.Client _client;
 
   void configure({http.Client? client}) {
@@ -106,6 +108,36 @@ class ApiService {
   Future<void> clearToken() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
+  }
+
+  Future<void> savePermissions(List<String> permissions) async {
+    final normalized =
+        permissions
+            .map((e) => e.trim().toLowerCase())
+            .where((e) => e.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_permissionsKey, normalized);
+  }
+
+  Future<List<String>> getPermissions() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_permissionsKey) ?? const <String>[];
+  }
+
+  Future<void> clearPermissions() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_permissionsKey);
+  }
+
+  /// Clears all local auth data (token + permissions). Intended for logout.
+  Future<void> clearAuthData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_tokenKey);
+    await prefs.remove(_permissionsKey);
   }
 
   Uri _parseUrl(Object url) {
