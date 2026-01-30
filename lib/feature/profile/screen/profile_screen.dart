@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:saraspatika/core/constants/colors.dart';
+import 'package:saraspatika/feature/profile/screen/update_profile/update_profile.dart';
+import 'package:saraspatika/feature/profile/screen/widget/section_setting_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -53,48 +55,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              _buildSectionHeader("Informasi Pribadi"),
-              _buildInfoTile(Icons.person, namaUser),
-              _buildInfoTile(Icons.email, emailUser),
-              _buildInfoTile(Icons.phone, noHpUser),
-              _buildInfoTile(Icons.badge, nipUser),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 10, top: 20),
+                child: Text(
+                  "INFORMASI PRIBADI",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: Colors.black54,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              infoCard(Icons.person, namaUser),
+              infoCard(Icons.email, emailUser),
+              infoCard(Icons.phone, noHpUser),
+              infoCard(Icons.badge, nipUser),
               const SizedBox(height: 24),
-              _buildSectionHeader("Pengaturan"),
-              _buildActionTile(Icons.face, "Registrasi Wajah", () {
-                _showSnackBar(context, 'Registrasi Wajah (UI dummy)');
-              }),
-              _buildActionTile(Icons.warning, "Absensi Darurat", () {
-                _showSnackBar(context, 'Absensi Darurat (UI dummy)');
-              }),
+
+              SectionSettingScreen(),
               const SizedBox(height: 100),
             ],
           ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showSnackBar(context, 'Edit Profil (UI dummy)'),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const UpdateProfile()),
+          );
+        },
         backgroundColor: AppColors.primaryColor,
         child: const Icon(Icons.edit, color: Colors.white),
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10, top: 20),
-      child: Text(
-        title.toUpperCase(),
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
-          color: Colors.black54,
-          letterSpacing: 1.2,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoTile(IconData icon, String value) {
+  Widget infoCard(IconData icon, String value) {
     return Card(
       elevation: 0.5,
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -105,24 +103,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           value,
           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
         ),
-      ),
-    );
-  }
-
-  Widget _buildActionTile(IconData icon, String label, VoidCallback onTap) {
-    return Card(
-      elevation: 0.5,
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        leading: Icon(icon, color: Colors.orange),
-        title: Text(label, style: const TextStyle(fontSize: 15)),
-        trailing: const Icon(
-          Icons.arrow_forward_ios,
-          size: 14,
-          color: Colors.grey,
-        ),
-        onTap: onTap,
       ),
     );
   }

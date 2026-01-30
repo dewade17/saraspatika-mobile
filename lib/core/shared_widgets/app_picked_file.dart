@@ -12,6 +12,261 @@ enum AppFileSource { fileSystem, gallery, camera }
 
 enum AppFilePickerMode { any, imagesOnly, videosOnly, media, custom }
 
+class AppFilePicker {
+  static Future<AppFileSource?> showSourceChooser(
+    BuildContext context, {
+    bool allowCamera = true,
+    bool allowGallery = true,
+    bool allowFileSystem = false,
+    String cameraLabel = 'Camera',
+    String galleryLabel = 'Gallery',
+    String filesLabel = 'Files',
+    bool hapticFeedback = true,
+    String dialogTitle = 'Choose source',
+  }) async {
+    final items = <_SourceItem>[
+      if (allowCamera)
+        const _SourceItem(
+          AppFileSource.camera,
+          'Camera',
+          Icons.photo_camera_rounded,
+        ),
+      if (allowGallery)
+        const _SourceItem(
+          AppFileSource.gallery,
+          'Gallery',
+          Icons.photo_library_rounded,
+        ),
+      if (allowFileSystem)
+        const _SourceItem(
+          AppFileSource.fileSystem,
+          'Files',
+          Icons.attach_file_rounded,
+        ),
+    ];
+
+    final normalized = items
+        .map(
+          (it) => _SourceItem(
+            it.source,
+            it.source == AppFileSource.camera
+                ? cameraLabel
+                : it.source == AppFileSource.gallery
+                ? galleryLabel
+                : filesLabel,
+            it.icon,
+          ),
+        )
+        .toList();
+
+    if (normalized.isEmpty) return null;
+
+    if (normalized.length == 1) return normalized.first.source;
+
+    return showModalBottomSheet<AppFileSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        dialogTitle,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ...normalized.map((it) {
+                return ListTile(
+                  leading: Icon(it.icon),
+                  title: Text(it.label),
+                  onTap: () async {
+                    if (hapticFeedback) HapticFeedback.selectionClick();
+                    Navigator.of(ctx).pop(it.source);
+                  },
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  static Future<List<AppPickedFile>> pickFromFileSystem({
+    required BuildContext context,
+    required AppFilePickerMode mode,
+    required FileType fileType,
+    required bool allowMultiple,
+    List<String>? allowedExtensions,
+    int? maxFileSizeBytes,
+  }) async {
+    final type = mode == AppFilePickerMode.custom ? FileType.custom : fileType;
+
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: allowMultiple,
+      type: type,
+      allowedExtensions: type == FileType.custom ? allowedExtensions : null,
+      withData: false,
+    );
+
+    if (result == null) return const [];
+
+    final picked = <AppPickedFile>[];
+    for (final pf in result.files) {
+      final path = pf.path;
+      if (path == null) continue;
+      final file = File(path);
+
+      final size = await _safeLength(file);
+      if (!_passesSizeLimit(context, size, maxFileSizeBytes)) continue;
+
+      picked.add(
+        AppPickedFile(
+          file: file,
+          source: AppFileSource.fileSystem,
+          name: pf.name,
+          sizeBytes: size,
+          extension: (pf.extension ?? '').toLowerCase(),
+        ),
+      );
+    }
+
+    return picked;
+  }
+
+  static Future<List<AppPickedFile>> pickFromGallery({
+    required BuildContext context,
+    required AppFilePickerMode mode,
+    required bool allowMultiple,
+    int? maxFileSizeBytes,
+  }) async {
+    final picker = ImagePicker();
+
+    if (mode == AppFilePickerMode.videosOnly) {
+      final x = await picker.pickVideo(source: ImageSource.gallery);
+      if (x == null) return const [];
+      final file = File(x.path);
+
+      final size = await _safeLength(file);
+      if (!_passesSizeLimit(context, size, maxFileSizeBytes)) return const [];
+
+      return [
+        AppPickedFile(
+          file: file,
+          source: AppFileSource.gallery,
+          sizeBytes: size,
+        ),
+      ];
+    }
+
+    if (allowMultiple &&
+        (mode == AppFilePickerMode.imagesOnly ||
+            mode == AppFilePickerMode.media)) {
+      final xs = await picker.pickMultiImage();
+      final out = <AppPickedFile>[];
+      for (final x in xs) {
+        final file = File(x.path);
+        final size = await _safeLength(file);
+        if (!_passesSizeLimit(context, size, maxFileSizeBytes)) continue;
+        out.add(
+          AppPickedFile(
+            file: file,
+            source: AppFileSource.gallery,
+            sizeBytes: size,
+          ),
+        );
+      }
+      return out;
+    }
+
+    final x = await picker.pickImage(source: ImageSource.gallery);
+    if (x == null) return const [];
+    final file = File(x.path);
+
+    final size = await _safeLength(file);
+    if (!_passesSizeLimit(context, size, maxFileSizeBytes)) return const [];
+
+    return [
+      AppPickedFile(file: file, source: AppFileSource.gallery, sizeBytes: size),
+    ];
+  }
+
+  static Future<List<AppPickedFile>> pickFromCamera({
+    required BuildContext context,
+    required bool compressCameraImage,
+    required ImageCompressOptions cameraCompressOptions,
+    int? maxFileSizeBytes,
+  }) async {
+    final picker = ImagePicker();
+
+    final x = await picker.pickImage(source: ImageSource.camera);
+    if (x == null) return const [];
+
+    File file = File(x.path);
+
+    if (compressCameraImage) {
+      file = await ImageCompressUtils.compressImageFile(
+        file,
+        options: cameraCompressOptions,
+      );
+    }
+
+    final size = await _safeLength(file);
+    if (!_passesSizeLimit(context, size, maxFileSizeBytes)) return const [];
+
+    return [
+      AppPickedFile(file: file, source: AppFileSource.camera, sizeBytes: size),
+    ];
+  }
+
+  static Future<int> _safeLength(File file) async {
+    try {
+      return await file.length();
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  static bool _passesSizeLimit(BuildContext context, int bytes, int? maxBytes) {
+    final max = maxBytes;
+    if (max == null || max <= 0) return true;
+    if (bytes <= max) return true;
+
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            'File too large. Max ${(max / (1024 * 1024)).toStringAsFixed(1)} MB',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+    return false;
+  }
+}
+
+class _SourceItem {
+  const _SourceItem(this.source, this.label, this.icon);
+  final AppFileSource source;
+  final String label;
+  final IconData icon;
+}
+
 class AppPickedFile {
   AppPickedFile({
     required this.file,
@@ -61,6 +316,81 @@ class AppFilePickerController extends ValueNotifier<List<AppPickedFile>> {
 
   void clear() => value = const [];
   void setFiles(List<AppPickedFile> files) => value = files;
+
+  Future<AppPickedFile?> pickProfilePhoto(
+    BuildContext context, {
+    bool allowCamera = true,
+    bool allowGallery = true,
+    bool compressCameraImage = true,
+    ImageCompressOptions cameraCompressOptions = const ImageCompressOptions(),
+    int? maxFileSizeBytes,
+    String cameraLabel = 'Camera',
+    String galleryLabel = 'Gallery',
+    bool hapticFeedback = true,
+  }) async {
+    try {
+      final source = await AppFilePicker.showSourceChooser(
+        context,
+        allowCamera: allowCamera,
+        allowGallery: allowGallery,
+        allowFileSystem: false,
+        cameraLabel: cameraLabel,
+        galleryLabel: galleryLabel,
+        hapticFeedback: hapticFeedback,
+      );
+
+      if (source == null) return null;
+
+      List<AppPickedFile> picked = const [];
+      switch (source) {
+        case AppFileSource.camera:
+          picked = await AppFilePicker.pickFromCamera(
+            context: context,
+            compressCameraImage: compressCameraImage,
+            cameraCompressOptions: cameraCompressOptions,
+            maxFileSizeBytes: maxFileSizeBytes,
+          );
+          break;
+        case AppFileSource.gallery:
+          picked = await AppFilePicker.pickFromGallery(
+            context: context,
+            mode: AppFilePickerMode.imagesOnly,
+            allowMultiple: false,
+            maxFileSizeBytes: maxFileSizeBytes,
+          );
+          break;
+        case AppFileSource.fileSystem:
+          picked = const [];
+          break;
+      }
+
+      if (picked.isEmpty) return null;
+
+      final file = picked.first;
+      setFiles([file]);
+      return file;
+    } on PlatformException catch (e) {
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(e.message ?? 'Failed to pick photo.'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      return null;
+    } catch (e) {
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      return null;
+    }
+  }
 }
 
 typedef AppPickedFilesValidator = String? Function(List<AppPickedFile> files);
@@ -126,10 +456,8 @@ class AppFilePickerField extends StatefulWidget {
 
   final AppFilePickerMode mode;
 
-  /// Used for file system picking via file_picker.
   final FileType fileType;
 
-  /// Used for FileType.custom.
   final List<String>? allowedExtensions;
 
   final bool allowMultiple;
@@ -140,7 +468,6 @@ class AppFilePickerField extends StatefulWidget {
   final bool allowGallery;
   final bool allowCamera;
 
-  /// Only applies to camera image capture.
   final bool compressCameraImage;
   final ImageCompressOptions cameraCompressOptions;
 
@@ -149,6 +476,7 @@ class AppFilePickerField extends StatefulWidget {
 
   final bool enabled;
   final bool readOnly;
+
   final bool allowClear;
 
   final String? label;
@@ -165,19 +493,23 @@ class AppFilePickerField extends StatefulWidget {
 
   final double borderRadius;
   final Color fillColor;
+
   final Color? borderColor;
   final Color? focusedBorderColor;
   final Color? disabledBorderColor;
   final Color? errorBorderColor;
-  final EdgeInsetsGeometry padding;
+
+  final EdgeInsets padding;
 
   final String? dialogTitle;
   final String? cameraLabel;
   final String? galleryLabel;
   final String? filesLabel;
+
   final String? clearText;
 
   final String? semanticsLabel;
+
   final bool hapticFeedback;
 
   @override
@@ -185,16 +517,16 @@ class AppFilePickerField extends StatefulWidget {
 }
 
 class _AppFilePickerFieldState extends State<AppFilePickerField> {
-  final GlobalKey<FormFieldState<List<AppPickedFile>>> _fieldKey =
-      GlobalKey<FormFieldState<List<AppPickedFile>>>();
-
-  final FocusNode _focusNode = FocusNode();
+  final _fieldKey = GlobalKey<FormFieldState<List<AppPickedFile>>>();
+  final _focusNode = FocusNode();
 
   AppFilePickerController? _controller;
   bool _listening = false;
 
-  late List<AppPickedFile> _value;
+  List<AppPickedFile> _value = const [];
   bool _busy = false;
+
+  bool get _interactive => widget.enabled && !widget.readOnly && !_busy;
 
   @override
   void initState() {
@@ -264,7 +596,6 @@ class _AppFilePickerFieldState extends State<AppFilePickerField> {
   }
 
   List<AppPickedFile> _normalize(List<AppPickedFile> files) {
-    // Dedupe by path; keep order.
     final out = <AppPickedFile>[];
     for (final f in files) {
       if (!out.any((x) => x.path == f.path)) out.add(f);
@@ -289,8 +620,6 @@ class _AppFilePickerFieldState extends State<AppFilePickerField> {
     }
     return true;
   }
-
-  bool get _interactive => widget.enabled && !widget.readOnly && !_busy;
 
   Color _resolveBorderColor({required bool hasError}) {
     final theme = Theme.of(context);
@@ -422,7 +751,6 @@ class _AppFilePickerFieldState extends State<AppFilePickerField> {
   }
 
   bool _fileSystemApplicable() {
-    // File system works for any/custom/media as well.
     return true;
   }
 
@@ -464,147 +792,33 @@ class _AppFilePickerFieldState extends State<AppFilePickerField> {
     }
   }
 
-  Future<List<AppPickedFile>> _pickFromFileSystem() async {
-    final type = widget.mode == AppFilePickerMode.custom
-        ? FileType.custom
-        : widget.fileType;
-
-    final result = await FilePicker.platform.pickFiles(
+  Future<List<AppPickedFile>> _pickFromFileSystem() {
+    return AppFilePicker.pickFromFileSystem(
+      context: context,
+      mode: widget.mode,
+      fileType: widget.fileType,
       allowMultiple: widget.allowMultiple,
-      type: type,
-      allowedExtensions: type == FileType.custom
-          ? widget.allowedExtensions
-          : null,
-      withData: false,
+      allowedExtensions: widget.allowedExtensions,
+      maxFileSizeBytes: widget.maxFileSizeBytes,
     );
-
-    if (result == null) return const [];
-
-    final picked = <AppPickedFile>[];
-    for (final pf in result.files) {
-      final path = pf.path;
-      if (path == null) continue; // (web or unsupported)
-      final file = File(path);
-
-      final size = await _safeLength(file);
-      if (!_passesSizeLimit(size)) continue;
-
-      picked.add(
-        AppPickedFile(
-          file: file,
-          source: AppFileSource.fileSystem,
-          name: pf.name,
-          sizeBytes: size,
-          extension: (pf.extension ?? '').toLowerCase(),
-        ),
-      );
-    }
-
-    return picked;
   }
 
-  Future<List<AppPickedFile>> _pickFromGallery() async {
-    final picker = ImagePicker();
-
-    if (widget.mode == AppFilePickerMode.videosOnly) {
-      final x = await picker.pickVideo(source: ImageSource.gallery);
-      if (x == null) return const [];
-      final file = File(x.path);
-
-      final size = await _safeLength(file);
-      if (!_passesSizeLimit(size)) return const [];
-
-      return [
-        AppPickedFile(
-          file: file,
-          source: AppFileSource.gallery,
-          sizeBytes: size,
-        ),
-      ];
-    }
-
-    if (widget.allowMultiple &&
-        (widget.mode == AppFilePickerMode.imagesOnly ||
-            widget.mode == AppFilePickerMode.media)) {
-      final xs = await picker.pickMultiImage();
-      final out = <AppPickedFile>[];
-      for (final x in xs) {
-        final file = File(x.path);
-        final size = await _safeLength(file);
-        if (!_passesSizeLimit(size)) continue;
-        out.add(
-          AppPickedFile(
-            file: file,
-            source: AppFileSource.gallery,
-            sizeBytes: size,
-          ),
-        );
-      }
-      return out;
-    }
-
-    // Single image (or media treated as image).
-    final x = await picker.pickImage(source: ImageSource.gallery);
-    if (x == null) return const [];
-    final file = File(x.path);
-
-    final size = await _safeLength(file);
-    if (!_passesSizeLimit(size)) return const [];
-
-    return [
-      AppPickedFile(file: file, source: AppFileSource.gallery, sizeBytes: size),
-    ];
+  Future<List<AppPickedFile>> _pickFromGallery() {
+    return AppFilePicker.pickFromGallery(
+      context: context,
+      mode: widget.mode,
+      allowMultiple: widget.allowMultiple,
+      maxFileSizeBytes: widget.maxFileSizeBytes,
+    );
   }
 
-  Future<List<AppPickedFile>> _pickFromCamera() async {
-    final picker = ImagePicker();
-
-    // Camera capture: image only
-    final x = await picker.pickImage(source: ImageSource.camera);
-    if (x == null) return const [];
-
-    File file = File(x.path);
-
-    if (widget.compressCameraImage) {
-      file = await ImageCompressUtils.compressImageFile(
-        file,
-        options: widget.cameraCompressOptions,
-      );
-    }
-
-    final size = await _safeLength(file);
-    if (!_passesSizeLimit(size)) return const [];
-
-    return [
-      AppPickedFile(file: file, source: AppFileSource.camera, sizeBytes: size),
-    ];
-  }
-
-  Future<int> _safeLength(File file) async {
-    try {
-      return await file.length();
-    } catch (_) {
-      return 0;
-    }
-  }
-
-  bool _passesSizeLimit(int bytes) {
-    final max = widget.maxFileSizeBytes;
-    if (max == null || max <= 0) return true;
-    if (bytes <= max) return true;
-
-    ScaffoldMessenger.maybeOf(context)
-      ?..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            'File too large. Max ${(max / (1024 * 1024)).toStringAsFixed(1)} MB',
-          ),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-
-    return false;
+  Future<List<AppPickedFile>> _pickFromCamera() {
+    return AppFilePicker.pickFromCamera(
+      context: context,
+      compressCameraImage: widget.compressCameraImage,
+      cameraCompressOptions: widget.cameraCompressOptions,
+      maxFileSizeBytes: widget.maxFileSizeBytes,
+    );
   }
 
   Widget _buildSelectedPreview(List<AppPickedFile> files) {
@@ -635,7 +849,6 @@ class _AppFilePickerFieldState extends State<AppFilePickerField> {
       );
     }
 
-    // List mode
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: List.generate(files.length, (i) {
