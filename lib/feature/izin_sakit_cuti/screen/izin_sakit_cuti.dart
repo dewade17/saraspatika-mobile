@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:saraspatika/core/constanta/colors.dart';
+import 'package:saraspatika/core/constants/colors.dart';
 
 class IzinSakitCuti extends StatefulWidget {
   const IzinSakitCuti({super.key});

@@ -2,7 +2,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:saraspatika/core/constanta/colors.dart';
+import 'package:saraspatika/core/constants/colors.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -42,14 +42,7 @@ class _SplashScreenState extends State<SplashScreen>
     // UI-only: dummy delay selesai splash (tanpa cek login / token)
     _timer = Timer(const Duration(seconds: 4), () {
       if (!mounted) return;
-
-      // Placeholder: tidak melakukan navigasi (UI only)
-      // Kalau kamu mau tetap ada "next screen" dummy, bisa ganti jadi pushReplacementNamed('/login')
-      // Navigator.of(context).pushReplacementNamed('/login');
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Splash selesai (UI dummy)')),
-      );
+      Navigator.of(context).pushReplacementNamed('/home-screen');
     });
   }
 

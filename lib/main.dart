@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
-// Import provider bisa dihapus dulu jika tidak dipakai
-// import 'package:provider/provider.dart';
+import 'package:provider/provider.dart';
+import 'package:saraspatika/feature/auth_wrapper.dart';
 import 'package:saraspatika/feature/home/screen/home_screen.dart';
+import 'package:saraspatika/feature/login/data/provider/auth_provider.dart';
+import 'package:saraspatika/feature/login/screen/login_screen.dart';
+import 'package:saraspatika/feature/reset_password/data/provider/reset_password_provider.dart';
+import 'package:saraspatika/feature/reset_password/screen/reset_password.dart';
 import 'package:saraspatika/feature/splash_screen/splash_screen.dart';
 
 void main() async {
-  // 3. Pastikan binding Flutter sudah siap
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 4. Inisialisasi data format tanggal untuk Indonesia ('id_ID')
   await initializeDateFormatting('id_ID', null);
-
   runApp(const MyApp());
 }
 
@@ -20,12 +20,23 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Hapus MultiProvider dan langsung return MaterialApp
-    return MaterialApp(
-      title: 'bank_sampah App',
-      debugShowCheckedModeBanner: false,
-      home: const SplashScreen(),
-      routes: {'/home-screen': (context) => const HomeScreen()},
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthProvider>(create: (_) => AuthProvider()),
+        ChangeNotifierProvider<ResetPasswordProvider>(
+          create: (_) => ResetPasswordProvider(),
+        ),
+      ],
+      child: MaterialApp(
+        title: 'bank_sampah App',
+        debugShowCheckedModeBanner: false,
+        home: const SplashScreen(),
+        routes: {
+          '/login': (context) => const LoginScreen(),
+          '/reset-password': (context) => const ResetPassword(),
+          '/home-screen': (context) => const AuthWrapper(child: HomeScreen()),
+        },
+      ),
     );
   }
 }
