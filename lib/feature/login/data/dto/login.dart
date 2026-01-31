@@ -1,5 +1,5 @@
 class PrivateUserData {
-  final int idUser;
+  final String idUser;
   final String role;
   final String namaPengguna;
   final List<String> permissions;
@@ -23,7 +23,7 @@ class PrivateUserData {
     }
 
     return PrivateUserData(
-      idUser: (json['id_user'] is num) ? (json['id_user'] as num).toInt() : 0,
+      idUser: (json['id_user'] ?? '').toString(),
       role: (json['role'] ?? '').toString(),
       namaPengguna: (json['nama_pengguna'] ?? json['name'] ?? '').toString(),
       permissions: perms,

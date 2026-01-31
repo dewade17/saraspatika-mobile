@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:saraspatika/core/shared_widgets/permission_guard.dart';
 import 'package:saraspatika/feature/login/data/provider/auth_provider.dart';
+import 'package:saraspatika/feature/profile/data/provider/user_profile_provider.dart';
 
 class ButtonAppBar extends StatefulWidget {
   const ButtonAppBar({super.key});
@@ -14,7 +15,9 @@ class _ButtonAppBarState extends State<ButtonAppBar> {
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
-    final userRole = authProvider.me?.role.toUpperCase() ?? '';
+    final profileProvider = context.watch<UserProfileProvider>();
+    final user = profileProvider.selectedUser;
+    final userRole = user?.role.toUpperCase() ?? '';
     final bool isKerja = userRole == 'PEGAWAI';
     final IconData menuIcon = isKerja
         ? Icons.business_center
@@ -23,7 +26,7 @@ class _ButtonAppBarState extends State<ButtonAppBar> {
     final String routeName = isKerja
         ? '/screen-agenda-kerja'
         : '/screen-agenda-mengajar';
-    final bool isProfileComplete = authProvider.me != null;
+    final bool isProfileComplete = user?.isProfileComplete ?? false;
 
     return Column(
       children: [
@@ -161,7 +164,47 @@ class _ButtonAppBarState extends State<ButtonAppBar> {
                     const SizedBox(height: 10),
                   ],
                 )
-              : const SizedBox(),
+              : Center(
+                  child: Column(
+                    children: [
+                      SizedBox(height: 10),
+                      InkWell(
+                        onTap: () async {
+                          await authProvider.logout();
+                          if (!context.mounted) return;
+                          Navigator.of(
+                            context,
+                          ).pushNamedAndRemoveUntil('/login', (route) => false);
+                        },
+                        child: const Column(
+                          children: [
+                            Icon(
+                              Icons.power_settings_new_sharp,
+                              size: 30,
+                              color: Colors.grey,
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Logout',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.all(13),
+                        child: Text(
+                          "Silakan lengkapi profil untuk mengakses menu.",
+                          style: TextStyle(color: Colors.grey, fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
         ),
       ],
     );

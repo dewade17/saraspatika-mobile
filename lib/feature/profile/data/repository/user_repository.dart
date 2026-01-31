@@ -110,8 +110,8 @@ class UserRepository {
     }
 
     final json = _asJsonMap(res);
-    if (json['data'] is List) {
-      return (json['data'] as List)
+    if (json['user'] is List) {
+      return (json['user'] as List)
           .map((e) => UserData.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     }
@@ -137,7 +137,7 @@ class UserRepository {
 
     final json = _asJsonMap(res);
 
-    final data = json['data'];
+    final data = json['user'];
     if (data is Map) {
       return UserData.fromJson(Map<String, dynamic>.from(data));
     }

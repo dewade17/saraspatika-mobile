@@ -89,6 +89,8 @@ class ApiService {
 
   static const String _permissionsKey = 'permissions';
 
+  static const String _userIdKey = 'id_user';
+
   http.Client _client;
 
   void configure({http.Client? client}) {
@@ -108,6 +110,35 @@ class ApiService {
   Future<void> clearToken() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
+  }
+
+  Future<void> saveUserId(String idUser) async {
+    final v = idUser.trim();
+    final prefs = await SharedPreferences.getInstance();
+
+    if (v.isEmpty) {
+      await prefs.remove(_userIdKey);
+      return;
+    }
+
+    await prefs.setString(_userIdKey, v);
+  }
+
+  Future<String?> getUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final s = prefs.getString(_userIdKey);
+    if (s != null && s.trim().isNotEmpty) return s.trim();
+
+    // Backward compatibility kalau dulu sempat tersimpan sebagai int
+    final legacy = prefs.getInt(_userIdKey);
+    if (legacy != null) {
+      final migrated = legacy.toString();
+      await prefs.setString(_userIdKey, migrated);
+      return migrated;
+    }
+
+    return null;
   }
 
   Future<void> savePermissions(List<String> permissions) async {
@@ -138,6 +169,7 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_permissionsKey);
+    await prefs.remove(_userIdKey);
   }
 
   Uri _parseUrl(Object url) {

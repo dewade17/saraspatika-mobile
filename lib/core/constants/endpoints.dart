@@ -8,5 +8,5 @@ class Endpoints {
   //reset-password&&get-token
   static const String resetRequestToken = "$baseURL/auth/request-token";
   static const String resetConfirm = "$baseURL/auth/reset-password";
-  static const String userProfile = "$baseURL/user";
+  static const String userProfile = "$baseURL/users";
 }

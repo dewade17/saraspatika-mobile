@@ -5,6 +5,7 @@ import 'package:saraspatika/feature/auth_wrapper.dart';
 import 'package:saraspatika/feature/home/screen/home_screen.dart';
 import 'package:saraspatika/feature/login/data/provider/auth_provider.dart';
 import 'package:saraspatika/feature/login/screen/login_screen.dart';
+import 'package:saraspatika/feature/profile/data/provider/user_profile_provider.dart';
 import 'package:saraspatika/feature/reset_password/data/provider/reset_password_provider.dart';
 import 'package:saraspatika/feature/reset_password/screen/reset_password.dart';
 import 'package:saraspatika/feature/splash_screen/splash_screen.dart';
@@ -25,6 +26,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<AuthProvider>(create: (_) => AuthProvider()),
         ChangeNotifierProvider<ResetPasswordProvider>(
           create: (_) => ResetPasswordProvider(),
+        ),
+        ChangeNotifierProvider<UserProfileProvider>(
+          create: (_) => UserProfileProvider(),
         ),
       ],
       child: MaterialApp(

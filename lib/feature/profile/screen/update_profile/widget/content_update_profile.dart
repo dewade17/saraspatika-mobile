@@ -1,10 +1,12 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:saraspatika/core/constants/colors.dart';
 import 'package:saraspatika/core/shared_widgets/app_button_widget.dart';
 import 'package:saraspatika/core/shared_widgets/app_picked_file.dart';
 import 'package:saraspatika/core/shared_widgets/app_text_field.dart';
+import 'package:saraspatika/feature/profile/data/dto/user.dart';
+import 'package:saraspatika/feature/profile/data/provider/user_profile_provider.dart';
 
 class ContentUpdateProfile extends StatefulWidget {
   const ContentUpdateProfile({super.key});
@@ -22,6 +24,13 @@ class _ContentUpdateProfileState extends State<ContentUpdateProfile> {
   final TextEditingController _nipController = TextEditingController();
 
   final AppFilePickerController _photoController = AppFilePickerController();
+  UserData? _loadedUser;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfile());
+  }
 
   @override
   void dispose() {
@@ -31,6 +40,13 @@ class _ContentUpdateProfileState extends State<ContentUpdateProfile> {
     _nipController.dispose();
     _photoController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadProfile() async {
+    final profileProvider = context.read<UserProfileProvider>();
+    try {
+      await profileProvider.fetchCurrentUser();
+    } catch (_) {}
   }
 
   Future<void> _pickProfilePhoto() async {
@@ -45,7 +61,15 @@ class _ContentUpdateProfileState extends State<ContentUpdateProfile> {
     );
   }
 
-  void _handleSave() {
+  void _applyUser(UserData user) {
+    _loadedUser = user;
+    _nameController.text = user.name;
+    _emailController.text = user.email;
+    _phoneController.text = user.nomorHandphone ?? '';
+    _nipController.text = user.nip ?? '';
+  }
+
+  Future<void> _handleSave() async {
     final form = _formKey.currentState;
     if (form == null) return;
 
@@ -56,14 +80,59 @@ class _ContentUpdateProfileState extends State<ContentUpdateProfile> {
       return;
     }
 
-    // TODO: sambungkan ke provider/repository update profil.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Perubahan disimpan (dummy).')),
-    );
+    final profileProvider = context.read<UserProfileProvider>();
+
+    try {
+      await profileProvider.updateCurrentUser(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        nomorHandphone: _phoneController.text.trim().isEmpty
+            ? null
+            : _phoneController.text.trim(),
+        nip: _nipController.text.trim().isEmpty
+            ? null
+            : _nipController.text.trim(),
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Perubahan berhasil disimpan.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            profileProvider.errorMessage ?? 'Gagal menyimpan perubahan.',
+          ),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final profileProvider = context.watch<UserProfileProvider>();
+    final user = profileProvider.selectedUser;
+    final error = profileProvider.errorMessage;
+
+    if (error != null && error.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        profileProvider.clearError();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error)));
+      });
+    }
+
+    if (user != null && user != _loadedUser) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _applyUser(user);
+      });
+    }
+
     return Form(
       key: _formKey,
       child: ListView(
@@ -170,7 +239,7 @@ class _ContentUpdateProfileState extends State<ContentUpdateProfile> {
           AppButton(
             text: 'Simpan Perubahan',
             fullWidth: true,
-            onPressed: _handleSave,
+            onPressed: profileProvider.isLoading ? null : _handleSave,
           ),
         ],
       ),

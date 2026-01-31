@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:saraspatika/core/constants/colors.dart';
 import 'package:saraspatika/feature/login/data/provider/auth_provider.dart';
 import 'package:saraspatika/feature/login/screen/login_screen.dart';
 
@@ -31,8 +32,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
       builder: (context, snapshot) {
         final s = snapshot.connectionState;
         if (s == ConnectionState.waiting || s == ConnectionState.active) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+          return Scaffold(
+            backgroundColor: AppColors.backgroundColor,
+            body: Center(
+              child: Image.asset(
+                'lib/assets/images/logo_saraspatika.png',
+                width: 400,
+                height: 400,
+              ),
+            ),
           );
         }
 

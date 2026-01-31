@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:saraspatika/core/constants/colors.dart';
+import 'package:saraspatika/feature/profile/data/provider/user_profile_provider.dart';
 import 'package:saraspatika/feature/profile/screen/update_profile/update_profile.dart';
 import 'package:saraspatika/feature/profile/screen/widget/section_setting_screen.dart';
 
@@ -11,9 +13,16 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  Future<void> _fakeRefresh() async {
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-    if (mounted) setState(() {});
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfile());
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      await context.read<UserProfileProvider>().fetchCurrentUser();
+    } catch (_) {}
   }
 
   void _showSnackBar(BuildContext context, String message) {
@@ -24,10 +33,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const String namaUser = 'I Putu Hendy Pradika, S.Pd';
-    const String emailUser = 'hendy@example.com';
-    const String noHpUser = '081234567890';
-    const String nipUser = '199201012024011001';
+    final profileProvider = context.watch<UserProfileProvider>();
+    final user = profileProvider.selectedUser;
+
+    final String namaUser = user?.name ?? '-';
+    final String emailUser = user?.email ?? '-';
+    final String noHpUser = user?.nomorHandphone ?? '-';
+    final String nipUser = user?.nip ?? '-';
+
+    final error = profileProvider.errorMessage;
+    if (error != null && error.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        profileProvider.clearError();
+        _showSnackBar(context, error);
+      });
+    }
 
     return Scaffold(
       backgroundColor: AppColors.primaryColor.withOpacity(0.1),
@@ -38,19 +59,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
         elevation: 0,
       ),
       body: RefreshIndicator(
-        onRefresh: _fakeRefresh,
+        onRefresh: _loadProfile,
         child: SafeArea(
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             children: [
               Center(
-                child: CircleAvatar(
-                  radius: 60,
-                  backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.person,
-                    size: 80,
-                    color: AppColors.primaryColor,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    border: Border.all(color: AppColors.primaryColor, width: 2),
+                  ),
+                  child: ClipOval(
+                    child:
+                        (user?.fotoProfilUrl != null &&
+                            user!.fotoProfilUrl!.trim().isNotEmpty)
+                        ? Image.network(
+                            user.fotoProfilUrl!,
+                            fit: BoxFit.cover,
+                            // Menangani jika URL bukan gambar atau error 404
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Icons.broken_image,
+                                size: 50,
+                                color: Colors.grey,
+                              );
+                            },
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            },
+                          )
+                        : const Icon(
+                            Icons.person,
+                            size: 80,
+                            color: AppColors.primaryColor,
+                          ),
                   ),
                 ),
               ),
@@ -72,9 +121,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               infoCard(Icons.phone, noHpUser),
               infoCard(Icons.badge, nipUser),
               const SizedBox(height: 24),
-
-              SectionSettingScreen(),
+              const SectionSettingScreen(),
               const SizedBox(height: 100),
+              
             ],
           ),
         ),

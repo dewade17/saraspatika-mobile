@@ -4,10 +4,12 @@ import 'package:saraspatika/feature/profile/data/dto/user.dart';
 import 'package:saraspatika/feature/profile/data/repository/user_repository.dart';
 
 class UserProfileProvider extends ChangeNotifier {
-  UserProfileProvider({UserRepository? repository})
-    : _repository = repository ?? UserRepository();
+  UserProfileProvider({UserRepository? repository, ApiService? api})
+    : _repository = repository ?? UserRepository(),
+      _api = api ?? ApiService();
 
   final UserRepository _repository;
+  final ApiService _api;
 
   bool _loading = false;
   String? _errorMessage;
@@ -31,6 +33,11 @@ class UserProfileProvider extends ChangeNotifier {
   }
 
   String _friendlyError(Object e) {
+    if (e is StateError) {
+      final msg = e.message.toString().trim();
+      if (msg.isNotEmpty) return msg;
+    }
+
     if (e is ApiException) {
       final d = e.details;
       if (d is Map) {
@@ -45,6 +52,15 @@ class UserProfileProvider extends ChangeNotifier {
       return 'Terjadi kesalahan jaringan/server.';
     }
     return 'Terjadi kesalahan: $e';
+  }
+
+  Future<String> _resolveStoredUserId() async {
+    final id = await _api.getUserId();
+    // Periksa apakah null atau hanya berisi spasi kosong
+    if (id == null || id.trim().isEmpty) {
+      throw StateError('User ID tidak ditemukan. Silakan login ulang.');
+    }
+    return id; // id sudah bertipe String, tidak perlu .toString() lagi
   }
 
   Future<List<UserData>> fetchUsers({String? query}) async {
@@ -69,6 +85,25 @@ class UserProfileProvider extends ChangeNotifier {
     _errorMessage = null;
 
     try {
+      final user = await _repository.fetchUserById(idUser);
+      _selectedUser = user;
+      notifyListeners();
+      return _selectedUser;
+    } catch (e) {
+      _errorMessage = _friendlyError(e);
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Mengambil profil user yang sedang login menggunakan id_user dari SharedPreferences.
+  Future<UserData?> fetchCurrentUser() async {
+    _setLoading(true);
+    _errorMessage = null;
+
+    try {
+      final idUser = await _resolveStoredUserId();
       final user = await _repository.fetchUserById(idUser);
       _selectedUser = user;
       notifyListeners();
@@ -132,6 +167,48 @@ class UserProfileProvider extends ChangeNotifier {
     _errorMessage = null;
 
     try {
+      final updated = await _repository.updateUser(
+        idUser,
+        email: email,
+        password: password,
+        name: name,
+        status: status,
+        nomorHandphone: nomorHandphone,
+        nip: nip,
+        fotoProfilUrl: fotoProfilUrl,
+        role: role,
+      );
+
+      _selectedUser = updated;
+      _users = _users
+          .map((u) => u.idUser == updated.idUser ? updated : u)
+          .toList();
+      notifyListeners();
+      return updated;
+    } catch (e) {
+      _errorMessage = _friendlyError(e);
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Update profil user yang sedang login menggunakan id_user dari SharedPreferences.
+  Future<UserData> updateCurrentUser({
+    String? email,
+    String? password,
+    String? name,
+    String? status,
+    String? nomorHandphone,
+    String? nip,
+    String? fotoProfilUrl,
+    String? role,
+  }) async {
+    _setLoading(true);
+    _errorMessage = null;
+
+    try {
+      final idUser = await _resolveStoredUserId();
       final updated = await _repository.updateUser(
         idUser,
         email: email,

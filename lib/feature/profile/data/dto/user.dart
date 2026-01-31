@@ -43,6 +43,14 @@ class UserData {
     required this.updatedAt,
   });
 
+  bool get isProfileComplete {
+    return name.trim().isNotEmpty &&
+        (status?.trim().isNotEmpty ?? false) &&
+        (nomorHandphone?.trim().isNotEmpty ?? false) &&
+        (nip?.trim().isNotEmpty ?? false) &&
+        (fotoProfilUrl?.trim().isNotEmpty ?? false);
+  }
+
   // Mengubah JSON Map menjadi Object UserData
   factory UserData.fromJson(Map<String, dynamic> json) {
     return UserData(
