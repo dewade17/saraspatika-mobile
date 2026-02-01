@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:saraspatika/core/constants/endpoints.dart';
 import 'package:saraspatika/core/services/api_service.dart';
 import 'package:saraspatika/feature/profile/data/dto/user.dart';
@@ -60,9 +62,38 @@ class UserRepository {
     String? status,
     String? nomorHandphone,
     String? nip,
-    String? fotoProfilUrl,
     String? role,
+    File? imageFile, // Tambahkan parameter File di sini
   }) async {
+    final url = _buildUserUrl(idUser);
+
+    // 1. LOGIKA MULTIPART (Jika ada file gambar)
+    if (imageFile != null) {
+      final res = await _api.multipart(
+        url,
+        method: 'PATCH', // Menggunakan PATCH sesuai kebutuhan backend Anda
+        useToken: true,
+        fields: {
+          if (email != null) 'email': email,
+          if (name != null) 'name': name,
+          if (nomorHandphone != null) 'nomor_handphone': nomorHandphone,
+          if (nip != null) 'nip': nip,
+          if (status != null) 'status': status,
+          if (role != null) 'role': role,
+        },
+        files: [
+          ApiUploadFile.fromBytes(
+            fieldName:
+                'foto_profil_url', // Field name yang diekspektasikan backend
+            bytes: await imageFile.readAsBytes(),
+            filename: imageFile.path.split('/').last,
+          ),
+        ],
+      );
+      return _parseUser(res);
+    }
+
+    // 2. LOGIKA JSON BIASA (Jika tidak ada file gambar)
     final body = {
       'email': email,
       'password': password,
@@ -70,15 +101,10 @@ class UserRepository {
       'status': status,
       'nomor_handphone': nomorHandphone,
       'nip': nip,
-      'foto_profil_url': fotoProfilUrl,
       'role': role,
     }..removeWhere((_, v) => v == null);
 
-    final res = await _api.put(
-      _buildUserUrl(idUser),
-      useToken: true,
-      body: body,
-    );
+    final res = await _api.patch(url, useToken: true, body: body);
 
     return _parseUser(res);
   }

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:saraspatika/core/services/api_service.dart';
 import 'package:saraspatika/feature/profile/data/dto/user.dart';
@@ -160,7 +162,7 @@ class UserProfileProvider extends ChangeNotifier {
     String? status,
     String? nomorHandphone,
     String? nip,
-    String? fotoProfilUrl,
+    File? imageFile,
     String? role,
   }) async {
     _setLoading(true);
@@ -175,7 +177,7 @@ class UserProfileProvider extends ChangeNotifier {
         status: status,
         nomorHandphone: nomorHandphone,
         nip: nip,
-        fotoProfilUrl: fotoProfilUrl,
+        imageFile: imageFile,
         role: role,
       );
 
@@ -201,7 +203,7 @@ class UserProfileProvider extends ChangeNotifier {
     String? status,
     String? nomorHandphone,
     String? nip,
-    String? fotoProfilUrl,
+    File? imageFile,
     String? role,
   }) async {
     _setLoading(true);
@@ -217,7 +219,7 @@ class UserProfileProvider extends ChangeNotifier {
         status: status,
         nomorHandphone: nomorHandphone,
         nip: nip,
-        fotoProfilUrl: fotoProfilUrl,
+        imageFile: imageFile,
         role: role,
       );
 

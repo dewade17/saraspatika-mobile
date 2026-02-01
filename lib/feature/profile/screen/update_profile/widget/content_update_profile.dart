@@ -81,7 +81,8 @@ class _ContentUpdateProfileState extends State<ContentUpdateProfile> {
     }
 
     final profileProvider = context.read<UserProfileProvider>();
-
+    final pickedFiles = _photoController.value;
+    File? imageFile = pickedFiles.isNotEmpty ? pickedFiles.first.file : null;
     try {
       await profileProvider.updateCurrentUser(
         name: _nameController.text.trim(),
@@ -92,6 +93,7 @@ class _ContentUpdateProfileState extends State<ContentUpdateProfile> {
         nip: _nipController.text.trim().isEmpty
             ? null
             : _nipController.text.trim(),
+        imageFile: imageFile,
       );
 
       if (!mounted) return;
@@ -146,6 +148,9 @@ class _ContentUpdateProfileState extends State<ContentUpdateProfile> {
                   valueListenable: _photoController,
                   builder: (context, files, _) {
                     final picked = files.isNotEmpty ? files.first : null;
+                    // Mengambil data user langsung dari provider yang sudah di-watch di atas
+                    final existingPhotoUrl =
+                        profileProvider.selectedUser?.fotoProfilUrl;
 
                     return ClipRRect(
                       borderRadius: BorderRadius.circular(100),
@@ -153,23 +158,51 @@ class _ContentUpdateProfileState extends State<ContentUpdateProfile> {
                         width: 120,
                         height: 120,
                         color: Colors.grey[200],
-                        child: (picked != null && picked.isImage)
-                            ? Image.file(
-                                picked.file,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) {
-                                  return Icon(
-                                    Icons.person,
-                                    size: 60,
-                                    color: Colors.grey[400],
-                                  );
-                                },
-                              )
-                            : Icon(
+                        child: () {
+                          // 1. Logika Jika Ada File Baru yang Dipilih
+                          if (picked != null && picked.isImage) {
+                            return Image.file(
+                              picked.file,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Icon(
                                 Icons.person,
                                 size: 60,
                                 color: Colors.grey[400],
                               ),
+                            );
+                          }
+
+                          // 2. Logika Jika Menggunakan Foto dari Server (Network)
+                          if (existingPhotoUrl != null &&
+                              existingPhotoUrl.isNotEmpty) {
+                            return Image.network(
+                              existingPhotoUrl,
+                              fit: BoxFit.cover,
+                              // Menangani jika URL tidak bisa diakses
+                              errorBuilder: (_, __, ___) => Icon(
+                                Icons.person,
+                                size: 60,
+                                color: Colors.grey[400],
+                              ),
+                              // Menampilkan loading saat proses unduh gambar
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return const Center(
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    );
+                                  },
+                            );
+                          }
+
+                          return Icon(
+                            Icons.person,
+                            size: 60,
+                            color: Colors.grey[400],
+                          );
+                        }(), // Memanggil fungsi anonim (Immediately Invoked Function)
                       ),
                     );
                   },

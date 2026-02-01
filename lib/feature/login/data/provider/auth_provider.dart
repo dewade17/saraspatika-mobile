@@ -35,13 +35,20 @@ class AuthProvider extends ChangeNotifier {
     if (e is ApiException) {
       final d = e.details;
       if (d is Map) {
-        final msg = d['message'] ?? d['error'] ?? d['msg'];
+        final msg = d['detail'] ?? d['message'] ?? d['error'] ?? d['msg'];
+
         if (msg != null && msg.toString().trim().isNotEmpty) {
+          if (msg.toString() == 'Invalid credentials') {
+            return 'Email atau password salah.';
+          }
           return msg.toString();
         }
       }
+
       if (e.statusCode == 400) return 'Input tidak valid.';
-      if (e.statusCode == 401) return 'Unauthorized.';
+      if (e.statusCode == 401) {
+        return 'Email atau password salah.';
+      }
       if (e.statusCode == 404) return 'Data tidak ditemukan.';
       return 'Terjadi kesalahan jaringan/server.';
     }
