@@ -1,6 +1,6 @@
 class Endpoints {
   static const String baseURL = "https://7qdb4npf-3000.asse.devtunnels.ms/api";
-  static const String faceBaseURL = "http://localhost:8080";
+  static const String faceBaseURL = "http://127.0.0.1:8000/api";
 
   //auth
   static const String login = "$baseURL/auth/login";
@@ -9,4 +9,15 @@ class Endpoints {
   static const String resetRequestToken = "$baseURL/auth/request-token";
   static const String resetConfirm = "$baseURL/auth/reset-password";
   static const String userProfile = "$baseURL/users";
+
+  static const String location = "$faceBaseURL/location";
+
+  //post-enrollface
+  static const String faceEnroll = "$faceBaseURL/api/face/enroll";
+
+  //post-verifyface
+  static const String verifyFace = "$faceBaseURL/api/face/verify";
+
+  //get-face
+  static const String getFace = "$faceBaseURL/api/face";
 }
