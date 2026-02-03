@@ -15,9 +15,6 @@ class Endpoints {
   //post-enrollface
   static const String faceEnroll = "$faceBaseURL/api/face/enroll";
 
-  //post-verifyface
-  static const String verifyFace = "$faceBaseURL/api/face/verify";
-
   //get-face
   static const String getFace = "$faceBaseURL/api/face";
 }
