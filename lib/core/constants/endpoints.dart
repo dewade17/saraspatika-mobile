@@ -10,6 +10,8 @@ class Endpoints {
   static const String resetConfirm = "$baseURL/auth/reset-password";
   static const String userProfile = "$baseURL/users";
 
+  static const String jadwalShift = "$baseURL/jadwal-shift-kerja";
+
   static const String location = "$faceBaseURL/location";
 
   //post-enrollface
