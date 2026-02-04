@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:saraspatika/core/constants/colors.dart';
@@ -465,7 +467,7 @@ class _AppTimePickerFieldState extends State<AppTimePickerField> {
               Padding(
                 padding: const EdgeInsets.only(left: 12, right: 12, top: 6),
                 child: Text(
-                  footerText!,
+                  footerText,
                   style: TextStyle(
                     fontSize: 12,
                     color: hasError

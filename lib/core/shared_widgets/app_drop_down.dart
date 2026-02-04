@@ -338,8 +338,9 @@ class _AppDropdownFieldState<T> extends State<AppDropdownField<T>> {
 
     final shouldReload =
         widget.reloadOnOpen || !_hasLoadedOnce || !widget.cacheLoadedItems;
-    if (!shouldReload && _cachedItems != null)
+    if (!shouldReload && _cachedItems != null) {
       return List<T>.from(_cachedItems!);
+    }
 
     final loaded = await loader();
     _hasLoadedOnce = true;
@@ -561,7 +562,7 @@ class _AppDropdownFieldState<T> extends State<AppDropdownField<T>> {
               Padding(
                 padding: const EdgeInsets.only(left: 12, right: 12, top: 6),
                 child: Text(
-                  footerText!,
+                  footerText,
                   style: TextStyle(
                     fontSize: 12,
                     color: hasError

@@ -23,8 +23,15 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
   bool _isBusy = false;
   bool _isFaceInside = false;
   bool _verificationCompleted = false;
-  int _currentStep = 0; // 0: Kedip, 1: Toleh Kiri, 2: Toleh Kanan, 3: Selesai
-  String _instructionText = "Posisikan wajah Anda di dalam oval";
+  int _currentStep = 0;
+  final List<String> _steps = [
+    "blink",
+    "look_left",
+    "look_right",
+    "face_forward",
+    "success",
+  ];
+  String _instructionText = "Posisikan wajah di dalam oval";
 
   @override
   void initState() {
@@ -100,27 +107,29 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
   void _checkLiveness(Face face) {
     double leftEye = face.leftEyeOpenProbability ?? 1.0;
     double rightEye = face.rightEyeOpenProbability ?? 1.0;
-    double headY = face.headEulerAngleY ?? 0; // Toleh Kiri/Kanan
+    double headY = face.headEulerAngleY ?? 0; // Sudut horizontal kepala
 
     if (_currentStep == 0) {
-      // Step: Kedipkan Mata
-      if (_instructionText != "Silakan kedipkan mata Anda") {
-        _speak("Silakan kedipkan mata Anda");
-      }
-      if (leftEye < 0.3 && rightEye < 0.3) {
-        _nextStep("Bagus! Sekarang toleh ke KIRI");
+      if (leftEye < 0.4 && rightEye < 0.4) {
+        _currentStep = 1;
+        _speak("Bagus! Sekarang toleh ke KIRI.");
       }
     } else if (_currentStep == 1) {
-      // Step: Toleh Kiri
-      if (headY > 25) {
-        _nextStep("Oke, sekarang toleh ke KANAN");
+      if (headY > 20) {
+        _currentStep = 2;
+        _speak("Oke, sekarang toleh ke KANAN.");
       }
     } else if (_currentStep == 2) {
-      // Step: Toleh Kanan
-      if (headY < -25) {
-        _verificationCompleted = true;
-        _nextStep("Sempurna. Verifikasi berhasil");
-        _onSuccess();
+      if (headY < -20) {
+        _currentStep = 3; // Pindah ke step menunggu posisi tengah
+        _speak("Bagus, sekarang hadap ke depan kembali.");
+      }
+    } else if (_currentStep == 3) {
+      // Menunggu wajah kembali ke posisi depan (toleransi -5 sampai 5 derajat)
+      if (headY > -5 && headY < 5) {
+        _currentStep = 4; // Step sukses
+        _speak("Sempurna. Verifikasi berhasil.");
+        _onSuccess(); // Foto diambil saat wajah sudah lurus ke depan
       }
     }
   }
@@ -249,15 +258,18 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
       left: 50,
       right: 50,
       child: Row(
-        children: List.generate(3, (index) {
+        children: List.generate(4, (index) {
+          bool isCompleted = index < _currentStep;
+          bool isCurrent = index == _currentStep;
           return Expanded(
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 500),
               height: 6,
               margin: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
-                color: index <= _currentStep
+                color: isCompleted
                     ? Colors.greenAccent
-                    : Colors.white24,
+                    : (isCurrent ? Colors.white : Colors.white24),
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
@@ -306,12 +318,24 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
   }
 
   Widget _buildStepIcon() {
-    IconData icon = Icons.face;
-    if (_currentStep == 0) icon = Icons.remove_red_eye;
-    if (_currentStep == 1) icon = Icons.arrow_back;
-    if (_currentStep == 2) icon = Icons.arrow_forward;
-    if (_currentStep >= 3) icon = Icons.check_circle;
-    return Icon(icon, color: Colors.greenAccent, size: 40);
+    IconData iconData;
+    switch (_currentStep) {
+      case 0:
+        iconData = Icons.remove_red_eye_outlined;
+        break;
+      case 1:
+        iconData = Icons.arrow_back_rounded;
+        break;
+      case 2:
+        iconData = Icons.arrow_forward_rounded;
+        break;
+      case 3:
+        iconData = Icons.face_retouching_natural_rounded;
+        break; // Icon hadap depan
+      default:
+        iconData = Icons.check_circle_outline_rounded;
+    }
+    return Icon(iconData, color: Colors.greenAccent, size: 40);
   }
 
   // --- 4. HELPER CONVERSION ---

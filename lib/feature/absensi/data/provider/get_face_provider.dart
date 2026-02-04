@@ -52,20 +52,39 @@ class GetFaceProvider extends ChangeNotifier {
     return 'Terjadi kesalahan: $e';
   }
 
-  Future<GetFace?> fetchFaceData(String userId) async {
-    _setLoading(true);
+  Future<GetFace?> fetchFaceData(String userId, {int maxRetries = 5}) async {
     _errorMessage = null;
+    _setLoading(true);
 
-    try {
-      final data = await _repository.fetchFaceData(userId);
-      _faceData = data;
-      notifyListeners();
-      return data;
-    } catch (e) {
-      _errorMessage = _friendlyError(e);
-      rethrow;
-    } finally {
-      _setLoading(false);
+    int attempt = 0;
+    while (attempt < maxRetries) {
+      try {
+        final data = await _repository.fetchFaceData(userId);
+
+        // KUNCI: Cek apakah 'items' tidak kosong (berarti Celery sudah selesai)
+        if (data != null && data.items.isNotEmpty) {
+          _faceData = data;
+          _setLoading(false);
+          return data;
+        }
+
+        // Jika data masih kosong, tunggu 2-3 detik sebelum mencoba lagi
+        attempt++;
+        if (attempt < maxRetries) {
+          await Future.delayed(const Duration(seconds: 3));
+        }
+      } catch (e) {
+        if (attempt >= maxRetries - 1) {
+          _errorMessage = _friendlyError(e);
+          _setLoading(false);
+          rethrow;
+        }
+        await Future.delayed(const Duration(seconds: 3));
+        attempt++;
+      }
     }
+
+    _setLoading(false);
+    return null; // Tetap kosong setelah maxRetries
   }
 }

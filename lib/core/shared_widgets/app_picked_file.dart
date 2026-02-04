@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -1053,7 +1055,7 @@ class _AppFilePickerFieldState extends State<AppFilePickerField> {
               Padding(
                 padding: const EdgeInsets.only(left: 12, right: 12, top: 6),
                 child: Text(
-                  footerText!,
+                  footerText,
                   style: TextStyle(
                     fontSize: 12,
                     color: hasError

@@ -217,8 +217,9 @@ class _AppDatePickerFieldState extends State<AppDatePickerField> {
     for (var i = 0; i < a.length; i++) {
       final x = a[i];
       final y = b[i];
-      if (x.year != y.year || x.month != y.month || x.day != y.day)
+      if (x.year != y.year || x.month != y.month || x.day != y.day) {
         return false;
+      }
     }
     return true;
   }
@@ -240,10 +241,12 @@ class _AppDatePickerFieldState extends State<AppDatePickerField> {
 
   DateTime _clampToRange(DateTime date) {
     final n = DateTime(date.year, date.month, date.day);
-    if (n.isBefore(_normalize(widget.firstDate)))
+    if (n.isBefore(_normalize(widget.firstDate))) {
       return _normalize(widget.firstDate);
-    if (n.isAfter(_normalize(widget.lastDate)))
+    }
+    if (n.isAfter(_normalize(widget.lastDate))) {
       return _normalize(widget.lastDate);
+    }
     return n;
   }
 
@@ -513,7 +516,7 @@ class _AppDatePickerFieldState extends State<AppDatePickerField> {
               Padding(
                 padding: const EdgeInsets.only(left: 12, right: 12, top: 6),
                 child: Text(
-                  footerText!,
+                  footerText,
                   style: TextStyle(
                     fontSize: 12,
                     color: hasError
@@ -600,8 +603,9 @@ class _AppMultiDatePickerDialogState extends State<AppMultiDatePickerDialog> {
 
   bool _isSelectable(DateTime day) {
     final n = _normalize(day);
-    if (n.isBefore(widget.firstDate) || n.isAfter(widget.lastDate))
+    if (n.isBefore(widget.firstDate) || n.isAfter(widget.lastDate)) {
       return false;
+    }
     final pred = widget.selectableDayPredicate;
     if (pred != null && !pred(n)) return false;
     return true;
@@ -704,8 +708,9 @@ class _AppMultiDatePickerDialogState extends State<AppMultiDatePickerDialog> {
     final today = DateTime.now();
     final normalized = _normalize(today);
     if (normalized.isBefore(widget.firstDate) ||
-        normalized.isAfter(widget.lastDate))
+        normalized.isAfter(widget.lastDate)) {
       return;
+    }
     setState(() => _month = DateTime(normalized.year, normalized.month, 1));
   }
 

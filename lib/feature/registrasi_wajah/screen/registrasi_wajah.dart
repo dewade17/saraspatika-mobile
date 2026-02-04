@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 
@@ -7,7 +6,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:provider/provider.dart';
 import 'package:saraspatika/core/constants/colors.dart';
+import 'package:saraspatika/feature/absensi/data/provider/enroll_face_provider.dart';
+import 'package:saraspatika/feature/login/data/provider/auth_provider.dart';
 
 class RegistrasiWajah extends StatefulWidget {
   const RegistrasiWajah({super.key});
@@ -25,9 +27,19 @@ class _RegistrasiWajahState extends State<RegistrasiWajah> {
   bool _hasGameStarted = false;
   String _debugInfo = "";
 
+  // Guard supaya _onSuccess() tidak terpanggil berkali-kali
+  bool _enrollTriggered = false;
+
   // State Liveness
   int _currentStep = 0;
-  final List<String> _steps = ["blink", "look_left", "look_right", "success"];
+  final List<String> _steps = [
+    "blink",
+    "look_left",
+    "look_right",
+    "face_forward",
+    "face_forward",
+    "success",
+  ];
   String _instructionText = "Posisikan wajah di dalam oval";
 
   @override
@@ -56,6 +68,7 @@ class _RegistrasiWajahState extends State<RegistrasiWajah> {
 
   Future<void> _speak(String text) async {
     await _tts.speak(text);
+    if (!mounted) return;
     setState(() => _instructionText = text);
   }
 
@@ -75,16 +88,12 @@ class _RegistrasiWajahState extends State<RegistrasiWajah> {
     await _cameraController?.initialize();
 
     _cameraController?.startImageStream(_processCameraImage);
+    if (!mounted) return;
     setState(() {});
   }
 
   // 3. Logika Pemrosesan Frame (Liveness)
-  // GANTI FUNGSI INI
   void _processCameraImage(CameraImage image) async {
-    // 1. Cek apakah stream benar-benar jalan
-    // debugPrint("Kamera mengirim frame: ${image.width}x${image.height}");
-    // (Saya matikan dulu biar console gak penuh, nyalakan jika perlu)
-
     if (_isBusy) return;
     _isBusy = true;
 
@@ -92,7 +101,6 @@ class _RegistrasiWajahState extends State<RegistrasiWajah> {
       final inputImage = _inputImageFromCameraImage(image);
 
       if (inputImage == null) {
-        // JIKA INI MUNCUL, BERARTI KONVERSI GAGAL
         debugPrint("!!! Gagal konversi gambar (InputImage is NULL) !!!");
       } else {
         final faces = await _faceDetector.processImage(inputImage);
@@ -124,46 +132,118 @@ class _RegistrasiWajahState extends State<RegistrasiWajah> {
     }
   }
 
-  // GANTI JUGA FUNGSI INI (VERSI DEBUG)
   void _checkLiveness(Face face) {
-    // Ambil probabilitas mata (jika null, anggap 1.0 atau terbuka)
     double leftEye = face.leftEyeOpenProbability ?? 1.0;
     double rightEye = face.rightEyeOpenProbability ?? 1.0;
     double headY = face.headEulerAngleY ?? 0;
 
-    // DEBUG: Pantau angka ini di VS Code/Android Studio
     debugPrint("Step: $_currentStep | Eye: $leftEye | HeadY: $headY");
+
     if (mounted) {
       setState(() {
         _debugInfo =
             "Mata: ${leftEye.toStringAsFixed(2)} | Kepala: ${headY.toStringAsFixed(0)}";
       });
     }
+
     if (_currentStep == 0) {
-      // CEK KEDIP: Kita coba naikkan threshold ke 0.4 agar lebih mudah terdeteksi
       if (leftEye < 0.4 && rightEye < 0.4) {
         _currentStep = 1;
         _speak("Bagus! Sekarang toleh ke KIRI.");
       }
     } else if (_currentStep == 1) {
-      // CEK TOLEH KIRI
       if (headY > 20) {
         _currentStep = 2;
         _speak("Oke, sekarang toleh ke KANAN.");
       }
     } else if (_currentStep == 2) {
-      // CEK TOLEH KANAN
       if (headY < -20) {
-        _currentStep = 3;
+        _currentStep = 3; // Pindah ke step menunggu posisi tengah
+        _speak("Bagus, sekarang hadap ke depan kembali.");
+      }
+    } else if (_currentStep == 3) {
+      // Toleransi posisi depan biasanya di antara -5 sampai 5 derajat
+      if (headY > -5 && headY < 5) {
+        _currentStep = 4; // Step sukses
         _speak("Sempurna. Verifikasi berhasil.");
-        _onSuccess();
+        _onSuccess(); // Foto diambil saat wajah sudah di tengah
       }
     }
   }
 
-  void _onSuccess() {
-    _cameraController?.stopImageStream();
-    // Lanjutkan ke API Matching biometrik
+  Future<void> _onSuccess() async {
+    if (_enrollTriggered) return;
+    _enrollTriggered = true;
+
+    final controller = _cameraController;
+    if (controller == null || !controller.value.isInitialized) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Kamera belum siap.')));
+      }
+      _enrollTriggered = false;
+      return;
+    }
+
+    final authProvider = context.read<AuthProvider>();
+    final enrollProvider = context.read<EnrollFaceProvider>();
+
+    try {
+      // Stop stream dulu (takePicture tidak bisa saat image stream aktif)
+      try {
+        await controller.stopImageStream();
+      } catch (_) {
+        // ignore: jika stream sudah berhenti
+      }
+
+      final XFile shot = await controller.takePicture();
+      final Uint8List bytes = await shot.readAsBytes();
+      final String fileName = shot.name.isNotEmpty
+          ? shot.name
+          : shot.path.split(Platform.pathSeparator).last;
+
+      final String userId = (authProvider.me?.idUser ?? '').trim();
+      if (userId.isEmpty) {
+        throw StateError('User ID tidak ditemukan. Silakan login ulang.');
+      }
+
+      await enrollProvider.enrollFace(
+        userId: userId,
+        images: [bytes],
+        filenames: [fileName],
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Registrasi wajah berhasil.')),
+      );
+
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil('/home-screen', (route) => false);
+    } catch (e) {
+      if (!mounted) return;
+
+      final msg = enrollProvider.errorMessage;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg ?? 'Gagal registrasi wajah: $e')),
+      );
+
+      // Allow retry: restart liveness flow
+      _enrollTriggered = false;
+      _currentStep = 0;
+      _hasGameStarted = false;
+      _isFaceInside = false;
+
+      // Restart stream so existing liveness logic keeps working
+      try {
+        await controller.startImageStream(_processCameraImage);
+      } catch (err) {
+        debugPrint('Gagal restart image stream: $err');
+      }
+    }
   }
 
   InputImage? _inputImageFromCameraImage(CameraImage image) {
@@ -233,9 +313,25 @@ class _RegistrasiWajahState extends State<RegistrasiWajah> {
         children: [
           CameraPreview(_cameraController!),
           _buildOverlay(),
-          _buildHeader(), // Header baru
-          _buildProgressBar(), // Progress bar baru
-          _buildInstructionUI(), //
+          _buildHeader(),
+          _buildProgressBar(),
+          _buildInstructionUI(),
+
+          // Loading overlay (di atas semuanya)
+          Consumer<EnrollFaceProvider>(
+            builder: (context, p, _) {
+              if (!p.isLoading) return const SizedBox.shrink();
+              return Positioned.fill(
+                child: AbsorbPointer(
+                  absorbing: true,
+                  child: Container(
+                    color: Colors.black54,
+                    child: const Center(child: CircularProgressIndicator()),
+                  ),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -243,11 +339,11 @@ class _RegistrasiWajahState extends State<RegistrasiWajah> {
 
   Widget _buildProgressBar() {
     return Positioned(
-      top: 110, // Di bawah header
+      top: 110,
       left: 40,
       right: 40,
       child: Row(
-        children: List.generate(3, (index) {
+        children: List.generate(4, (index) {
           bool isCompleted = index < _currentStep;
           bool isCurrent = index == _currentStep;
 
@@ -300,7 +396,6 @@ class _RegistrasiWajahState extends State<RegistrasiWajah> {
               width: 280,
               decoration: BoxDecoration(
                 color: Colors.white,
-                // Border akan berubah warna jika wajah terdeteksi
                 border: Border.all(
                   color: _isFaceInside ? Colors.green : Colors.transparent,
                   width: 6,
@@ -364,7 +459,6 @@ class _RegistrasiWajahState extends State<RegistrasiWajah> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Icon Dinamis berdasarkan step
                 _buildStepIcon(),
                 const SizedBox(height: 15),
                 AnimatedSwitcher(
@@ -389,7 +483,6 @@ class _RegistrasiWajahState extends State<RegistrasiWajah> {
     );
   }
 
-  // Icon kecil untuk membantu instruksi visual
   Widget _buildStepIcon() {
     IconData iconData;
     switch (_currentStep) {
@@ -401,6 +494,9 @@ class _RegistrasiWajahState extends State<RegistrasiWajah> {
         break;
       case 2:
         iconData = Icons.arrow_forward_rounded;
+        break;
+      case 3:
+        iconData = Icons.face_retouching_natural_rounded;
         break;
       default:
         iconData = Icons.check_circle_outline_rounded;

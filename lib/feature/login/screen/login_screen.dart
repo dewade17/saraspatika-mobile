@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:saraspatika/core/services/api_service.dart';
 import 'package:saraspatika/core/shared_widgets/app_button_widget.dart';
 import 'package:saraspatika/core/shared_widgets/app_text_field.dart';
+import 'package:saraspatika/feature/absensi/data/provider/get_face_provider.dart';
 import 'package:saraspatika/feature/login/data/provider/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -37,13 +39,46 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     final authProvider = context.read<AuthProvider>();
+    final getFaceProvider = context.read<GetFaceProvider>();
+
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
     try {
       await authProvider.login(email: email, password: password);
+
+      final userId = (authProvider.me?.idUser ?? '').trim();
+      if (userId.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ID user tidak ditemukan.')),
+        );
+        return;
+      }
+
+      bool hasFace = false;
+      try {
+        final face = await getFaceProvider.fetchFaceData(userId);
+        hasFace = (face?.items ?? const []).isNotEmpty;
+      } catch (e) {
+        // Kalau server return 404 saat data wajah belum ada, treat sebagai "belum ada data"
+        if (e is ApiException && e.statusCode == 404) {
+          hasFace = false;
+        } else {
+          if (!mounted) return;
+          final msg =
+              getFaceProvider.errorMessage ?? 'Gagal mengambil data wajah.';
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(msg)));
+          return;
+        }
+      }
+
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed('/home-screen');
+      Navigator.of(
+        context,
+      ).pushReplacementNamed(hasFace ? '/home-screen' : '/registrasi-wajah');
     } catch (_) {
       if (!mounted) return;
       final msg = authProvider.errorMessage ?? 'Login gagal.';
