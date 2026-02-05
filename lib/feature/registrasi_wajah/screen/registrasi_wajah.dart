@@ -8,7 +8,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:provider/provider.dart';
 import 'package:saraspatika/core/constants/colors.dart';
-import 'package:saraspatika/feature/absensi/data/provider/enroll_face_provider.dart';
+import 'package:saraspatika/feature/registrasi_wajah/data/provider/enroll_face_provider.dart';
 import 'package:saraspatika/feature/login/data/provider/auth_provider.dart';
 
 class RegistrasiWajah extends StatefulWidget {

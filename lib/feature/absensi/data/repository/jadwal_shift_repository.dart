@@ -28,7 +28,7 @@ class JadwalShiftRepository {
 
   String _buildTodayShiftUrl(String userId) {
     final safeId = Uri.encodeComponent(userId);
-    return '${Endpoints.jadwalShift}/today/$safeId';
+    return '${Endpoints.jadwalShift}/$safeId';
   }
 
   Map<String, dynamic> _asJsonMap(Object? res) {

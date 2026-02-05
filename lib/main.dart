@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
-import 'package:saraspatika/feature/absensi/data/provider/enroll_face_provider.dart';
+import 'package:saraspatika/feature/registrasi_wajah/data/provider/enroll_face_provider.dart';
 import 'package:saraspatika/feature/absensi/data/provider/get_face_provider.dart';
+import 'package:saraspatika/feature/absensi/screen/absensi_kedatangan/absensi_kedatangan_screen.dart';
 import 'package:saraspatika/feature/auth_wrapper.dart';
 import 'package:saraspatika/feature/home/screen/home_screen.dart';
 import 'package:saraspatika/feature/login/data/provider/auth_provider.dart';
@@ -48,7 +49,10 @@ class MyApp extends StatelessWidget {
           '/login': (context) => const LoginScreen(),
           '/reset-password': (context) => const ResetPassword(),
           '/registrasi-wajah': (context) => const RegistrasiWajah(),
-          '/home-screen': (context) => const AuthWrapper(child: HomeScreen()),
+          '/home-screen': (context) => const AuthWrapper(child: HomeScreen(),),
+          '/absensi-kedatangan': (context) => const AbsensiKedatanganScreen(),
+          // '/absensi-kepulangan': (context) => const AbsensiKedatanganScreen(),
+          
         },
       ),
     );

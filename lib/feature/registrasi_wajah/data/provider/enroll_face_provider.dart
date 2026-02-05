@@ -2,8 +2,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:saraspatika/core/services/api_service.dart';
-import 'package:saraspatika/feature/absensi/data/dto/enroll_face.dart';
-import 'package:saraspatika/feature/absensi/data/repository/enroll_face_repository.dart';
+import 'package:saraspatika/feature/registrasi_wajah/data/dto/enroll_face.dart';
+import 'package:saraspatika/feature/registrasi_wajah/data/repository/enroll_face_repository.dart';
 
 class EnrollFaceProvider extends ChangeNotifier {
   EnrollFaceProvider({EnrollFaceRepository? repository})

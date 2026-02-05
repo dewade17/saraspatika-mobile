@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:saraspatika/core/constants/endpoints.dart';
 import 'package:saraspatika/core/services/api_service.dart';
-import 'package:saraspatika/feature/absensi/data/dto/enroll_face.dart';
+import 'package:saraspatika/feature/registrasi_wajah/data/dto/enroll_face.dart';
 
 class EnrollFaceRepository {
   EnrollFaceRepository({ApiService? api}) : _api = api ?? ApiService();

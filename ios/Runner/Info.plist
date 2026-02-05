@@ -49,5 +49,7 @@
 		<string>Aplikasi butuh akses kamera untuk verifikasi wajah.</string>
 		<key>NSMicrophoneUsageDescription</key>
 		<string>Aplikasi butuh akses mikrofon.</string>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>Aplikasi memerlukan lokasi untuk absensi.</string>
 	</dict>
 </plist>

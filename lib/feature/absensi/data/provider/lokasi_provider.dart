@@ -17,9 +17,21 @@ class LokasiProvider extends ChangeNotifier {
 
   bool get isLoading => _loading;
   String? get errorMessage => _errorMessage;
+
   List<Lokasi> get locations => _locations;
   Lokasi? get selectedLocation => _selectedLocation;
+
   List<LokasiWithDistance> get nearestLocations => _nearestLocations;
+
+  LokasiWithDistance? get nearestLocationWithDistance =>
+      _nearestLocations.isNotEmpty ? _nearestLocations.first : null;
+
+  Lokasi? get nearestLocation => nearestLocationWithDistance?.lokasi;
+
+  void selectLocation(Lokasi? lokasi) {
+    _selectedLocation = lokasi;
+    notifyListeners();
+  }
 
   void clearError() {
     _errorMessage = null;
@@ -114,6 +126,12 @@ class LokasiProvider extends ChangeNotifier {
         limit: limit,
       );
       _nearestLocations = items;
+
+      // Default: auto-select lokasi terdekat bila belum ada pilihan.
+      if (_selectedLocation == null && _nearestLocations.isNotEmpty) {
+        _selectedLocation = _nearestLocations.first.lokasi;
+      }
+
       notifyListeners();
       return _nearestLocations;
     } catch (e) {
