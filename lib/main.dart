@@ -13,6 +13,9 @@ import 'package:saraspatika/feature/registrasi_wajah/screen/registrasi_wajah.dar
 import 'package:saraspatika/feature/reset_password/data/provider/reset_password_provider.dart';
 import 'package:saraspatika/feature/reset_password/screen/reset_password.dart';
 import 'package:saraspatika/feature/splash_screen/splash_screen.dart';
+import 'package:saraspatika/feature/absensi/data/provider/absensi_provider.dart';
+import 'package:saraspatika/feature/absensi/data/provider/jadwal_shift_provider.dart';
+import 'package:saraspatika/feature/absensi/data/provider/lokasi_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,6 +43,13 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<UserProfileProvider>(
           create: (_) => UserProfileProvider(),
         ),
+        ChangeNotifierProvider<AbsensiProvider>(
+          create: (_) => AbsensiProvider(),
+        ),
+        ChangeNotifierProvider<LokasiProvider>(create: (_) => LokasiProvider()),
+        ChangeNotifierProvider<JadwalShiftProvider>(
+          create: (_) => JadwalShiftProvider(),
+        ),
       ],
       child: MaterialApp(
         title: 'Saraspatika',
@@ -49,10 +59,10 @@ class MyApp extends StatelessWidget {
           '/login': (context) => const LoginScreen(),
           '/reset-password': (context) => const ResetPassword(),
           '/registrasi-wajah': (context) => const RegistrasiWajah(),
-          '/home-screen': (context) => const AuthWrapper(child: HomeScreen(),),
+          '/home-screen': (context) => const AuthWrapper(child: HomeScreen()),
           '/absensi-kedatangan': (context) => const AbsensiKedatanganScreen(),
+
           // '/absensi-kepulangan': (context) => const AbsensiKedatanganScreen(),
-          
         },
       ),
     );

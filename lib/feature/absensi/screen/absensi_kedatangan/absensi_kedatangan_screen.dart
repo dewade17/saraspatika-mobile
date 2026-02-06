@@ -1,8 +1,18 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
 import 'package:saraspatika/core/shared_widgets/app_button_widget.dart';
+import 'package:saraspatika/feature/absensi/data/dto/absensi_checkin.dart';
+import 'package:saraspatika/feature/absensi/data/dto/jadwal_shift.dart';
+import 'package:saraspatika/feature/absensi/data/provider/absensi_provider.dart';
+import 'package:saraspatika/feature/absensi/data/provider/jadwal_shift_provider.dart';
+import 'package:saraspatika/feature/absensi/data/provider/lokasi_provider.dart';
+import 'package:saraspatika/feature/absensi/screen/face_detection/face_detection_screen.dart';
+import 'package:quickalert/quickalert.dart';
 
 class AbsensiKedatanganScreen extends StatefulWidget {
   const AbsensiKedatanganScreen({super.key});
@@ -19,22 +29,78 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
 
   double _zoom = 15.7;
 
-  final String _tanggal = 'Minggu, 13 Juli 2025';
-  final String _sekolah = 'SD SARASWATI 4 DENPASAR';
-  final String _status = 'Belum\nabsen';
-
   bool _isLocating = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initLocation();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _initLocation();
+      if (!mounted) return;
+
+      final jadwalProvider = context.read<JadwalShiftProvider>();
+      final absensiProvider = context.read<AbsensiProvider>();
+
+      try {
+        // Jalankan fetch jadwal dan status absensi secara paralel
+        await Future.wait([
+          jadwalProvider.fetchTodayShift(),
+          absensiProvider.fetchStatus(), // Mengambil data status terbaru
+        ]);
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Gagal memuat data: $e')));
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final absensiProvider = context.watch<AbsensiProvider>();
+    final jadwalProvider = context.watch<JadwalShiftProvider>();
+    final lokasiProvider = context.watch<LokasiProvider>();
+    final selectedLocation = lokasiProvider.selectedLocation;
+
+    // --- LOGIKA STATUS ABSENSI ---
+    final statusItem = absensiProvider.status?.item;
+    final bool isAlreadyCheckedIn = statusItem?.waktuMasuk != null;
+
+    // Tentukan teks status untuk Info Card
+    String displayStatus = 'Belum\nabsen';
+    Color statusColor = const Color(0xFFE85A5A); // Merah untuk belum absen
+
+    if (isAlreadyCheckedIn) {
+      displayStatus = statusItem?.statusMasuk ?? "TEPAT";
+
+      // Cek apakah status mengandung kata "TERLAMBAT"
+      if (displayStatus.toUpperCase().contains('TERLAMBAT')) {
+        statusColor = Colors.redAccent; // Warna peringatan untuk terlambat
+      } else {
+        statusColor = const Color(0xFF57B87B); // Hijau untuk TEPAT
+      }
+    }
+    // -----------------------------
+
+    // --- LOGIKA PENGECEKAN RADIUS ---
+    double distanceInMeters = 0.0;
+    bool isWithinRadius = false;
+
+    if (selectedLocation != null) {
+      // Menghitung jarak antara koordinat user dan koordinat kantor
+      distanceInMeters = Geolocator.distanceBetween(
+        _markerPosition.latitude,
+        _markerPosition.longitude,
+        selectedLocation.latitude,
+        selectedLocation.longitude,
+      );
+
+      // Cek apakah jarak lebih kecil atau sama dengan radius (misal 70m)
+      isWithinRadius = distanceInMeters <= selectedLocation.radius;
+    }
+    // --------------------------------
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF57B87B),
@@ -73,14 +139,31 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
               TileLayer(
                 urlTemplate:
                     'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-                subdomains: const [
-                  'a',
-                  'b',
-                  'c',
-                  'd',
-                ], // Dibutuhkan untuk CartoDB
+                subdomains: const ['a', 'b', 'c', 'd'],
                 userAgentPackageName: 'id.mycompany.saraspatika',
               ),
+              if (selectedLocation != null)
+                CircleLayer(
+                  circles: [
+                    CircleMarker(
+                      point: LatLng(
+                        selectedLocation.latitude,
+                        selectedLocation.longitude,
+                      ),
+                      radius: selectedLocation.radius
+                          .toDouble(), // Radius 70 meter
+                      useRadiusInMeter:
+                          true, // WAJIB true agar radius dihitung dalam meter, bukan pixel
+                      color: const Color(
+                        0xFF57B87B,
+                      ).withOpacity(0.2), // Warna isi transparan
+                      borderColor: const Color(
+                        0xFF57B87B,
+                      ), // Warna garis pinggir
+                      borderStrokeWidth: 2,
+                    ),
+                  ],
+                ),
               MarkerLayer(
                 markers: [
                   Marker(
@@ -89,7 +172,7 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
                     height: 28,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Color(0xFF1E6DFF),
+                        color: const Color(0xFF1E6DFF),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: Colors.white, width: 2),
                       ),
@@ -104,9 +187,17 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
             right: 12,
             top: 12,
             child: _InfoCard(
-              tanggal: _tanggal,
-              sekolah: _sekolah,
-              status: _status,
+              tanggal: DateFormat(
+                'EEEE, dd MMMM yyyy',
+                'id_ID',
+              ).format(DateTime.now()),
+              sekolah:
+                  lokasiProvider.selectedLocation?.namaLokasi ??
+                  'Mencari lokasi...',
+              status: displayStatus,
+              statusColor: statusColor,
+              isLoadingJadwal: jadwalProvider.isLoading,
+              jadwalShift: jadwalProvider.todayShift,
             ),
           ),
           Positioned(
@@ -123,14 +214,26 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
             ),
           ),
           Positioned(
-            left: 12, // Batas kiri
-            right: 12, // TAMBAHKAN INI agar lebar terdefinisi
-            bottom:
-                24, // Saya sesuaikan jarak bawahnya agar tidak menumpuk dengan tombol lokasi
+            left: 12,
+            right: 12,
+            bottom: 24,
             child: AppButton(
-              text: 'Verifikasi Wajah',
+              text: isAlreadyCheckedIn
+                  ? 'Sudah Absen Masuk'
+                  : (selectedLocation == null
+                        ? 'Mencari Lokasi...'
+                        : (isWithinRadius
+                              ? 'Verifikasi Wajah'
+                              : 'Di Luar Radius (${distanceInMeters.toStringAsFixed(0)}m)')),
               fullWidth: true,
+              isLoading: absensiProvider.isLoading,
               manageInternalLoading: false,
+              backgroundColor: (isWithinRadius && !isAlreadyCheckedIn)
+                  ? const Color(0xFF57B87B)
+                  : Colors.grey.shade400,
+              onPressedAsync: (isWithinRadius && !isAlreadyCheckedIn)
+                  ? _handleFaceVerification
+                  : null,
             ),
           ),
         ],
@@ -138,16 +241,134 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
     );
   }
 
+  Future<void> _handleFaceVerification() async {
+    // 1. Ambil foto dari Kamera
+    final File? photo = await Navigator.push<File>(
+      context,
+      MaterialPageRoute(builder: (_) => const FaceDetectionScreen()),
+    );
+
+    if (!mounted || photo == null) return;
+
+    final lokasiProvider = context.read<LokasiProvider>();
+    final absensiProvider = context.read<AbsensiProvider>();
+    final selectedLocation = lokasiProvider.selectedLocation;
+
+    if (selectedLocation == null) {
+      QuickAlert.show(
+        context: context,
+        type: QuickAlertType.error,
+        title: 'Lokasi Tidak Ditemukan',
+        text: 'Lokasi absensi belum dipilih atau tidak terdeteksi.',
+      );
+      return;
+    }
+
+    // --- Perubahan: Gunakan QuickAlert untuk Feedback ---
+
+    // 2. Tampilkan Loading Alert
+    QuickAlert.show(
+      context: context,
+      type: QuickAlertType.loading,
+      title: 'Memproses...',
+      text: 'Mengirim data absensi dan memverifikasi wajah.',
+      barrierDismissible: false,
+    );
+
+    try {
+      // 3. Eksekusi Check-In
+      await absensiProvider.checkIn(
+        request: CheckInRequest(
+          userId: '', // ID akan di-resolve otomatis oleh provider
+          locationId: selectedLocation.idLokasi,
+          lat: _markerPosition.latitude,
+          lng: _markerPosition.longitude,
+          capturedAt: DateTime.now().toIso8601String(),
+        ),
+        imageFile: photo,
+      );
+
+      // Ambil jam masuk dari status terbaru setelah berhasil check-in
+      final statusItem = absensiProvider.status?.item;
+      String jamMasuk = statusItem?.waktuMasuk != null
+          ? DateFormat('HH:mm').format(statusItem!.waktuMasuk!.toLocal())
+          : DateFormat('HH:mm').format(DateTime.now());
+
+      if (!mounted) return;
+
+      // Tutup loading alert sebelum menampilkan sukses
+      Navigator.of(context, rootNavigator: true).pop();
+
+      // 4. Tampilkan QuickAlert Sukses
+      await QuickAlert.show(
+        context: context,
+        type: QuickAlertType.success,
+        title: 'Berhasil!',
+        text: 'Anda berhasil melakukan check-in pada pukul $jamMasuk.',
+        confirmBtnText: 'OK',
+        onConfirmBtnTap: () {
+          Navigator.of(context).pop(); // Tutup dialog QuickAlert
+          Navigator.of(context).pop();
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      // Tutup loading alert sebelum menampilkan error
+      Navigator.of(context, rootNavigator: true).pop();
+
+      // 5. Tampilkan QuickAlert Error
+      final msg = absensiProvider.errorMessage ?? 'Gagal memproses absensi: $e';
+      await QuickAlert.show(
+        context: context,
+        type: QuickAlertType.error,
+        title: 'Terjadi Kesalahan',
+        text: msg,
+        confirmBtnText: 'Coba Lagi',
+      );
+    }
+  }
+
   Future<void> _initLocation() async {
     setState(() => _isLocating = true);
     try {
       final pos = await _determinePosition();
+
+      // --- PENGECEKAN FAKE GPS ---
+      // Di Android, geolocator memiliki flag isMocked
+      if (pos.isMocked) {
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Lokasi Palsu Terdeteksi'),
+            content: const Text(
+              'Harap matikan aplikasi Fake GPS atau Mock Location untuk melakukan absensi.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return; // Hentikan proses jika terdeteksi Fake GPS
+      }
+      // ---------------------------
+
       final latLng = LatLng(pos.latitude, pos.longitude);
 
       if (!mounted) return;
       setState(() => _markerPosition = latLng);
 
       _mapController.move(latLng, _zoom);
+
+      final lokasiProvider = context.read<LokasiProvider>();
+      await lokasiProvider.fetchNearestLocations(
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -258,11 +479,17 @@ class _InfoCard extends StatelessWidget {
   final String tanggal;
   final String sekolah;
   final String status;
+  final Color statusColor;
+  final bool isLoadingJadwal;
+  final JadwalShift? jadwalShift;
 
   const _InfoCard({
     required this.tanggal,
     required this.sekolah,
+    required this.statusColor,
     required this.status,
+    required this.isLoadingJadwal,
+    required this.jadwalShift,
   });
 
   @override
@@ -273,56 +500,80 @@ class _InfoCard extends StatelessWidget {
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
+        child: Column(
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    tanggal,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                      color: Color(0xFF333333),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    sekolah,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12.5,
-                      color: Color(0xFF333333),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            Row(
               children: [
-                const Text(
-                  'Status:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12.5,
-                    color: Color(0xFF333333),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tanggal,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        sekolah,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12.5,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  status,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 12.5,
-                    color: Color(0xFFE85A5A),
-                    height: 1.05,
-                  ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text(
+                      'Status:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      status,
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12.5,
+                        color: statusColor,
+                        height: 1.05,
+                      ),
+                    ),
+                  ],
                 ),
               ],
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: isLoadingJadwal
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(
+                      jadwalShift == null
+                          ? 'Jadwal shift hari ini tidak tersedia.'
+                          : 'Shift Mengajar: ${jadwalShift?.jamMulaiKerja != null ? DateFormat('HH:mm').format(jadwalShift!.jamMulaiKerja!) : "--:--"} - ${jadwalShift?.jamSelesaiKerja != null ? DateFormat('HH:mm').format(jadwalShift!.jamSelesaiKerja!) : "--:--"}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
             ),
           ],
         ),

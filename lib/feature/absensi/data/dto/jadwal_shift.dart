@@ -8,14 +8,17 @@ String jadwalShiftResponseToJson(JadwalShiftResponse data) =>
     json.encode(data.toJson());
 
 class JadwalShiftResponse {
-  final JadwalShift data;
+  final JadwalShift? data; // Dibuat nullable jika data tidak ditemukan
 
   JadwalShiftResponse({required this.data});
 
   factory JadwalShiftResponse.fromJson(Map<String, dynamic> json) =>
-      JadwalShiftResponse(data: JadwalShift.fromJson(json["data"]));
+      JadwalShiftResponse(
+        // Menangani kemungkinan data null dari API
+        data: json["data"] == null ? null : JadwalShift.fromJson(json["data"]),
+      );
 
-  Map<String, dynamic> toJson() => {"data": data.toJson()};
+  Map<String, dynamic> toJson() => {"data": data?.toJson()};
 }
 
 class JadwalShift {
@@ -23,28 +26,40 @@ class JadwalShift {
   final String idUser;
   final String idPolaKerja;
   final DateTime tanggal;
+  // Field tambahan baru
+  final String namaPolaKerja;
+  final DateTime jamMulaiKerja;
+  final DateTime jamSelesaiKerja;
 
   JadwalShift({
     required this.idJadwalShift,
     required this.idUser,
     required this.idPolaKerja,
     required this.tanggal,
+    required this.namaPolaKerja,
+    required this.jamMulaiKerja,
+    required this.jamSelesaiKerja,
   });
 
   factory JadwalShift.fromJson(Map<String, dynamic> json) => JadwalShift(
-    idJadwalShift: json["id_jadwal_shift"],
-    idUser: json["id_user"],
-    idPolaKerja: json["id_pola_kerja"],
-    // Parsing string "2026-02-03" menjadi objek DateTime
+    idJadwalShift: json["id_jadwal_shift"] ?? "",
+    idUser: json["id_user"] ?? "",
+    idPolaKerja: json["id_pola_kerja"] ?? "",
     tanggal: DateTime.parse(json["tanggal"]),
+    // Parsing field baru
+    namaPolaKerja: json["nama_pola_kerja"] ?? "",
+    jamMulaiKerja: DateTime.parse(json["jam_mulai_kerja"]),
+    jamSelesaiKerja: DateTime.parse(json["jam_selesai_kerja"]),
   );
 
   Map<String, dynamic> toJson() => {
     "id_jadwal_shift": idJadwalShift,
     "id_user": idUser,
     "id_pola_kerja": idPolaKerja,
-    // Mengubah DateTime kembali ke string YYYY-MM-DD
     "tanggal":
         "${tanggal.year.toString().padLeft(4, '0')}-${tanggal.month.toString().padLeft(2, '0')}-${tanggal.day.toString().padLeft(2, '0')}",
+    "nama_pola_kerja": namaPolaKerja,
+    "jam_mulai_kerja": jamMulaiKerja.toIso8601String(),
+    "jam_selesai_kerja": jamSelesaiKerja.toIso8601String(),
   };
 }

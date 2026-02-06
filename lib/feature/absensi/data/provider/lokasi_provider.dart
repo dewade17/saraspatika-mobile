@@ -127,8 +127,10 @@ class LokasiProvider extends ChangeNotifier {
       );
       _nearestLocations = items;
 
-      // Default: auto-select lokasi terdekat bila belum ada pilihan.
-      if (_selectedLocation == null && _nearestLocations.isNotEmpty) {
+      // PERUBAHAN DI SINI:
+      // Selalu pilih item pertama (terdekat) sebagai selectedLocation
+      // setiap kali pencarian ini dipanggil.
+      if (_nearestLocations.isNotEmpty) {
         _selectedLocation = _nearestLocations.first.lokasi;
       }
 

@@ -23,14 +23,9 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
   bool _isBusy = false;
   bool _isFaceInside = false;
   bool _verificationCompleted = false;
+  bool _hasGameStarted = false; // Flag untuk memulai instruksi pertama
+
   int _currentStep = 0;
-  final List<String> _steps = [
-    "blink",
-    "look_left",
-    "look_right",
-    "face_forward",
-    "success",
-  ];
   String _instructionText = "Posisikan wajah di dalam oval";
 
   @override
@@ -46,7 +41,8 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
   void _initializeDetector() {
     _faceDetector = FaceDetector(
       options: FaceDetectorOptions(
-        enableClassification: true, // Untuk deteksi mata
+        enableClassification:
+            true, // WAJIB: Untuk deteksi probabilitas mata terbuka
         enableTracking: true,
         enableLandmarks: true,
       ),
@@ -92,6 +88,12 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
         final face = faces.first;
         if (mounted) setState(() => _isFaceInside = true);
 
+        // TRIGGER PERTAMA: Saat wajah masuk oval pertama kali
+        if (!_hasGameStarted) {
+          _hasGameStarted = true;
+          _speak("Wajah terdeteksi. Silakan berkedip sekarang.");
+        }
+
         // Jalankan logika pengecekan gerakan
         _checkLiveness(face);
       } else {
@@ -105,65 +107,66 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
   }
 
   void _checkLiveness(Face face) {
+    // Ambil probabilitas mata terbuka (0.0 sampai 1.0)
     double leftEye = face.leftEyeOpenProbability ?? 1.0;
     double rightEye = face.rightEyeOpenProbability ?? 1.0;
     double headY = face.headEulerAngleY ?? 0; // Sudut horizontal kepala
 
+    // STEP 0: Deteksi Berkedip
     if (_currentStep == 0) {
+      // Threshold < 0.4 dianggap mata tertutup/berkedip
       if (leftEye < 0.4 && rightEye < 0.4) {
         _currentStep = 1;
         _speak("Bagus! Sekarang toleh ke KIRI.");
       }
-    } else if (_currentStep == 1) {
+    }
+    // STEP 1: Toleh Kiri
+    else if (_currentStep == 1) {
       if (headY > 20) {
         _currentStep = 2;
         _speak("Oke, sekarang toleh ke KANAN.");
       }
-    } else if (_currentStep == 2) {
+    }
+    // STEP 2: Toleh Kanan
+    else if (_currentStep == 2) {
       if (headY < -20) {
-        _currentStep = 3; // Pindah ke step menunggu posisi tengah
+        _currentStep = 3;
         _speak("Bagus, sekarang hadap ke depan kembali.");
       }
-    } else if (_currentStep == 3) {
-      // Menunggu wajah kembali ke posisi depan (toleransi -5 sampai 5 derajat)
+    }
+    // STEP 3: Hadap Depan (Final Check)
+    else if (_currentStep == 3) {
       if (headY > -5 && headY < 5) {
         _currentStep = 4; // Step sukses
         _speak("Sempurna. Verifikasi berhasil.");
-        _onSuccess(); // Foto diambil saat wajah sudah lurus ke depan
+        _onSuccess();
       }
     }
   }
 
-  void _nextStep(String message) {
-    setState(() => _currentStep++);
-    _speak(message);
-  }
-
   Future<void> _speak(String text) async {
+    if (!mounted) return;
     setState(() => _instructionText = text);
     await _tts.speak(text);
   }
 
   void _onSuccess() async {
-    _cameraController?.stopImageStream();
-    // Simulasi pengambilan gambar untuk matching biometrik
-    final XFile file = await _cameraController!.takePicture();
-    debugPrint("Gambar tersimpan di: ${file.path}");
+    if (_verificationCompleted) return;
+    _verificationCompleted = true;
 
-    // Tampilkan dialog sukses atau pindah halaman
-    if (mounted) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text("Berhasil"),
-          content: const Text("Data biometrik Anda telah terverifikasi."),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("OK"),
-            ),
-          ],
-        ),
+    try {
+      await _cameraController?.stopImageStream();
+      // Berikan delay sangat singkat agar frame kamera stabil di posisi depan
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      final XFile photo = await _cameraController!.takePicture();
+      if (!mounted) return;
+      Navigator.pop(context, File(photo.path));
+    } catch (e) {
+      _verificationCompleted = false;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal mengambil foto verifikasi: $e')),
       );
     }
   }
@@ -207,7 +210,8 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
           ),
           Align(
             alignment: Alignment.center,
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
               height: 380,
               width: 300,
               decoration: BoxDecoration(
@@ -300,13 +304,17 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
               children: [
                 _buildStepIcon(),
                 const SizedBox(height: 15),
-                Text(
-                  _instructionText,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: Text(
+                    _instructionText,
+                    key: ValueKey(_instructionText),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -321,7 +329,7 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
     IconData iconData;
     switch (_currentStep) {
       case 0:
-        iconData = Icons.remove_red_eye_outlined;
+        iconData = Icons.remove_red_eye_outlined; // Ikon mata untuk kedip
         break;
       case 1:
         iconData = Icons.arrow_back_rounded;
@@ -331,16 +339,15 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
         break;
       case 3:
         iconData = Icons.face_retouching_natural_rounded;
-        break; // Icon hadap depan
+        break;
       default:
         iconData = Icons.check_circle_outline_rounded;
     }
     return Icon(iconData, color: Colors.greenAccent, size: 40);
   }
 
-  // --- 4. HELPER CONVERSION ---
-
   InputImage? _inputImageFromCameraImage(CameraImage image) {
+    if (_cameraController == null) return null;
     final camera = _cameraController!.description;
     final sensorOrientation = camera.sensorOrientation;
     InputImageRotation? rotation = InputImageRotationValue.fromRawValue(
