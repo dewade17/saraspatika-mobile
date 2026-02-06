@@ -3,6 +3,7 @@ import 'dart:convert';
 class CheckOutRequest {
   final String userId;
   final String absensiId; // ID unik dari record absensi saat check-in
+  final String locationId;
   final double lat;
   final double lng;
   final String? capturedAt; // ISO8601 timestamp untuk mode offline
@@ -10,6 +11,7 @@ class CheckOutRequest {
   CheckOutRequest({
     required this.userId,
     required this.absensiId,
+    required this.locationId,
     required this.lat,
     required this.lng,
     this.capturedAt,
@@ -20,6 +22,7 @@ class CheckOutRequest {
     return {
       'user_id': userId,
       'absensi_id': absensiId,
+      'location_id': locationId,
       'lat': lat.toString(),
       'lng': lng.toString(),
       if (capturedAt != null) 'captured_at': capturedAt!,
@@ -41,6 +44,7 @@ class CheckOutRequest {
     return CheckOutRequest(
       userId: map['user_id'] ?? '',
       absensiId: map['absensi_id'] ?? '',
+      locationId: map['location_id'] ?? '',
       lat: (map['lat'] as num).toDouble(),
       lng: (map['lng'] as num).toDouble(),
       capturedAt: map['captured_at'],

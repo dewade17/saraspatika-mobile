@@ -1,11 +1,48 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 import 'package:saraspatika/core/services/api_service.dart';
 import 'package:saraspatika/feature/absensi/data/dto/absensi_checkin.dart';
 import 'package:saraspatika/feature/absensi/data/dto/absensi_checkout.dart';
 import 'package:saraspatika/feature/absensi/data/dto/absensi_status.dart';
 import 'package:saraspatika/feature/absensi/data/repository/absensi_repository.dart';
+
+enum AbsensiUiEventType { loading, success, error }
+
+class AbsensiUiEvent {
+  final AbsensiUiEventType type;
+  final String title;
+  final String message;
+  final String? confirmText;
+
+  const AbsensiUiEvent({
+    required this.type,
+    required this.title,
+    required this.message,
+    this.confirmText,
+  });
+
+  factory AbsensiUiEvent.loading() => const AbsensiUiEvent(
+    type: AbsensiUiEventType.loading,
+    title: 'Memproses...',
+    message: 'Mengirim data absensi dan memverifikasi wajah.',
+  );
+
+  factory AbsensiUiEvent.success(String message) => AbsensiUiEvent(
+    type: AbsensiUiEventType.success,
+    title: 'Berhasil!',
+    message: message,
+    confirmText: 'OK',
+  );
+
+  factory AbsensiUiEvent.error(String message) => AbsensiUiEvent(
+    type: AbsensiUiEventType.error,
+    title: 'Terjadi Kesalahan',
+    message: message,
+    confirmText: 'Coba Lagi',
+  );
+}
 
 class AbsensiProvider extends ChangeNotifier {
   AbsensiProvider({AbsensiRepository? repository, ApiService? api})
@@ -22,12 +59,20 @@ class AbsensiProvider extends ChangeNotifier {
   Map<String, dynamic>? _lastCheckInResponse;
   Map<String, dynamic>? _lastCheckOutResponse;
 
+  AbsensiUiEvent? _uiEvent;
+
   bool get isLoading => _loading;
   String? get errorMessage => _errorMessage;
 
   AbsensiStatus? get status => _status;
   Map<String, dynamic>? get lastCheckInResponse => _lastCheckInResponse;
   Map<String, dynamic>? get lastCheckOutResponse => _lastCheckOutResponse;
+
+  AbsensiUiEvent? get uiEvent => _uiEvent;
+
+  void consumeUiEvent() {
+    _uiEvent = null;
+  }
 
   void clearError() {
     _errorMessage = null;
@@ -117,7 +162,6 @@ class AbsensiProvider extends ChangeNotifier {
       final res = await _repository.checkIn(request: req, imageFile: imageFile);
       _lastCheckInResponse = res;
 
-      // Best-effort refresh status (jangan gagal kalau status endpoint error)
       try {
         await fetchStatus(userId: resolvedId);
       } catch (_) {}
@@ -149,6 +193,7 @@ class AbsensiProvider extends ChangeNotifier {
           : CheckOutRequest(
               userId: resolvedId,
               absensiId: request.absensiId,
+              locationId: request.locationId,
               lat: request.lat,
               lng: request.lng,
               capturedAt: request.capturedAt,
@@ -171,6 +216,53 @@ class AbsensiProvider extends ChangeNotifier {
       rethrow;
     } finally {
       _setLoading(false);
+    }
+  }
+
+  Future<void> submitCheckInWithFace({
+    required File imageFile,
+    required String? locationId,
+    required double? lat,
+    required double? lng,
+  }) async {
+    if (locationId == null ||
+        locationId.trim().isEmpty ||
+        lat == null ||
+        lng == null) {
+      _uiEvent = AbsensiUiEvent.error(
+        'Lokasi absensi belum dipilih atau koordinat belum tersedia.',
+      );
+      notifyListeners();
+      return;
+    }
+
+    _uiEvent = AbsensiUiEvent.loading();
+    notifyListeners();
+
+    try {
+      await checkIn(
+        request: CheckInRequest(
+          userId: '',
+          locationId: locationId.trim(),
+          lat: lat,
+          lng: lng,
+          capturedAt: DateTime.now().toIso8601String(),
+        ),
+        imageFile: imageFile,
+      );
+
+      final waktuMasuk =
+          _status?.item?.waktuMasuk?.toLocal() ?? DateTime.now().toLocal();
+      final jamMasuk = DateFormat('HH:mm').format(waktuMasuk);
+
+      _uiEvent = AbsensiUiEvent.success(
+        'Anda berhasil melakukan check-in pada pukul $jamMasuk.',
+      );
+      notifyListeners();
+    } catch (e) {
+      final msg = _errorMessage ?? _friendlyError(e);
+      _uiEvent = AbsensiUiEvent.error(msg);
+      notifyListeners();
     }
   }
 }

@@ -7,21 +7,22 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:quickalert/quickalert.dart';
 import 'package:saraspatika/core/shared_widgets/app_button_widget.dart';
+import 'package:saraspatika/feature/absensi/data/dto/absensi_checkout.dart';
 import 'package:saraspatika/feature/absensi/data/dto/jadwal_shift.dart';
 import 'package:saraspatika/feature/absensi/data/provider/absensi_provider.dart';
 import 'package:saraspatika/feature/absensi/data/provider/jadwal_shift_provider.dart';
 import 'package:saraspatika/feature/absensi/data/provider/lokasi_provider.dart';
 import 'package:saraspatika/feature/absensi/screen/face_detection/face_detection_screen.dart';
 
-class AbsensiKedatanganScreen extends StatefulWidget {
-  const AbsensiKedatanganScreen({super.key});
+class AbsensiKepulanganScreen extends StatefulWidget {
+  const AbsensiKepulanganScreen({super.key});
 
   @override
-  State<AbsensiKedatanganScreen> createState() =>
-      _AbsensiKedatanganScreenState();
+  State<AbsensiKepulanganScreen> createState() =>
+      _AbsensiKepulanganScreenState();
 }
 
-class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
+class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
   static const LatLng _fallbackCenter = LatLng(-8.670458, 115.212629);
 
   final MapController _mapController = MapController();
@@ -30,7 +31,7 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
   AbsensiProvider? _absensiProvider;
   LokasiProvider? _lokasiProvider;
 
-  bool _absensiLoadingDialogVisible = false;
+  bool _loadingDialogVisible = false;
   double? _lastCenteredLat;
   double? _lastCenteredLng;
 
@@ -44,7 +45,6 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
       _absensiProvider = context.read<AbsensiProvider>();
       _lokasiProvider = context.read<LokasiProvider>();
 
-      _absensiProvider?.addListener(_onAbsensiProviderChanged);
       _lokasiProvider?.addListener(_onLokasiProviderChanged);
 
       await _lokasiProvider?.refreshCurrentLocationAndNearest();
@@ -68,7 +68,6 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
 
   @override
   void dispose() {
-    _absensiProvider?.removeListener(_onAbsensiProviderChanged);
     _lokasiProvider?.removeListener(_onLokasiProviderChanged);
     super.dispose();
   }
@@ -125,57 +124,25 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
     );
   }
 
-  void _onAbsensiProviderChanged() {
+  Future<void> _showLoading(String title, String message) async {
     if (!mounted) return;
-    final absensiProvider = _absensiProvider;
-    if (absensiProvider == null) return;
+    if (_loadingDialogVisible) return;
 
-    final event = absensiProvider.uiEvent;
-    if (event == null) return;
-
-    absensiProvider.consumeUiEvent();
-
-    if (event.type == AbsensiUiEventType.loading) {
-      if (_absensiLoadingDialogVisible) return;
-      _absensiLoadingDialogVisible = true;
-
-      QuickAlert.show(
-        context: context,
-        type: QuickAlertType.loading,
-        title: event.title,
-        text: event.message,
-        barrierDismissible: false,
-      );
-      return;
-    }
-
-    if (_absensiLoadingDialogVisible) {
-      _absensiLoadingDialogVisible = false;
-      Navigator.of(context, rootNavigator: true).pop();
-    }
-
-    if (event.type == AbsensiUiEventType.success) {
-      QuickAlert.show(
-        context: context,
-        type: QuickAlertType.success,
-        title: event.title,
-        text: event.message,
-        confirmBtnText: event.confirmText ?? 'OK',
-        onConfirmBtnTap: () {
-          Navigator.of(context, rootNavigator: true).pop();
-          Navigator.of(context).maybePop();
-        },
-      );
-      return;
-    }
-
+    _loadingDialogVisible = true;
     QuickAlert.show(
       context: context,
-      type: QuickAlertType.error,
-      title: event.title,
-      text: event.message,
-      confirmBtnText: event.confirmText ?? 'Coba Lagi',
+      type: QuickAlertType.loading,
+      title: title,
+      text: message,
+      barrierDismissible: false,
     );
+  }
+
+  void _hideLoadingIfVisible() {
+    if (!mounted) return;
+    if (!_loadingDialogVisible) return;
+    _loadingDialogVisible = false;
+    Navigator.of(context, rootNavigator: true).pop();
   }
 
   Future<void> _onTapRecenter() async {
@@ -183,6 +150,73 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
   }
 
   Future<void> _onTapVerifikasiWajah() async {
+    final absensiProvider = context.read<AbsensiProvider>();
+    final lokasiProvider = context.read<LokasiProvider>();
+
+    final statusItem = absensiProvider.status?.item;
+    final absensiId = statusItem?.idAbsensi.trim();
+    final sudahAbsenMasuk = statusItem?.waktuMasuk != null;
+    final sudahAbsenPulang = statusItem?.waktuPulang != null;
+
+    if (!sudahAbsenMasuk) {
+      QuickAlert.show(
+        context: context,
+        type: QuickAlertType.error,
+        title: 'Tidak bisa check-out',
+        text: 'Anda belum melakukan absen masuk hari ini.',
+        confirmBtnText: 'OK',
+      );
+      return;
+    }
+
+    if (sudahAbsenPulang) {
+      QuickAlert.show(
+        context: context,
+        type: QuickAlertType.info,
+        title: 'Info',
+        text: 'Anda sudah melakukan absen pulang.',
+        confirmBtnText: 'OK',
+      );
+      return;
+    }
+
+    if (absensiId == null || absensiId.isEmpty) {
+      QuickAlert.show(
+        context: context,
+        type: QuickAlertType.error,
+        title: 'Data tidak lengkap',
+        text: 'ID absensi tidak ditemukan. Silakan refresh status.',
+        confirmBtnText: 'OK',
+      );
+      return;
+    }
+
+    final coord = lokasiProvider.currentCoordinate;
+    final selectedLocation = lokasiProvider.selectedLocation;
+
+    if (selectedLocation == null || coord == null) {
+      QuickAlert.show(
+        context: context,
+        type: QuickAlertType.error,
+        title: 'Lokasi belum siap',
+        text: 'Lokasi absensi belum dipilih atau koordinat belum tersedia.',
+        confirmBtnText: 'OK',
+      );
+      return;
+    }
+
+    if (!lokasiProvider.isWithinSelectedRadius) {
+      final d = lokasiProvider.distanceToSelectedMeters;
+      QuickAlert.show(
+        context: context,
+        type: QuickAlertType.error,
+        title: 'Di luar radius',
+        text: 'Anda berada di luar radius lokasi (${d.toStringAsFixed(0)}m).',
+        confirmBtnText: 'OK',
+      );
+      return;
+    }
+
     final File? photo = await Navigator.push<File>(
       context,
       MaterialPageRoute(builder: (_) => const FaceDetectionScreen()),
@@ -190,15 +224,59 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
 
     if (!mounted || photo == null) return;
 
-    final lokasiProvider = context.read<LokasiProvider>();
-    final coord = lokasiProvider.currentCoordinate;
-
-    await context.read<AbsensiProvider>().submitCheckInWithFace(
-      imageFile: photo,
-      locationId: lokasiProvider.selectedLocation?.idLokasi,
-      lat: coord?.latitude,
-      lng: coord?.longitude,
+    await _showLoading(
+      'Memproses...',
+      'Mengirim data absensi dan memverifikasi wajah.',
     );
+
+    try {
+      await absensiProvider.checkOut(
+        request: CheckOutRequest(
+          userId: '',
+          absensiId: absensiId,
+          locationId: selectedLocation.idLokasi,
+          lat: coord.latitude,
+          lng: coord.longitude,
+          capturedAt: DateTime.now().toIso8601String(),
+        ),
+        imageFile: photo,
+      );
+
+      if (!mounted) return;
+      _hideLoadingIfVisible();
+
+      final waktuPulang =
+          absensiProvider.status?.item?.waktuPulang?.toLocal() ??
+          DateTime.now().toLocal();
+      final jamPulang = DateFormat('HH:mm').format(waktuPulang);
+
+      QuickAlert.show(
+        context: context,
+        type: QuickAlertType.success,
+        title: 'Berhasil!',
+        text: 'Anda berhasil melakukan check-out pada pukul $jamPulang.',
+        confirmBtnText: 'OK',
+        onConfirmBtnTap: () {
+          Navigator.of(context, rootNavigator: true).pop();
+          Navigator.of(context).maybePop();
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _hideLoadingIfVisible();
+
+      final msg =
+          absensiProvider.errorMessage ??
+          e.toString().replaceFirst('Exception: ', '');
+
+      QuickAlert.show(
+        context: context,
+        type: QuickAlertType.error,
+        title: 'Terjadi Kesalahan',
+        text: msg,
+        confirmBtnText: 'OK',
+      );
+    }
   }
 
   @override
@@ -214,26 +292,34 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
         : _fallbackCenter;
 
     final statusItem = absensiProvider.status?.item;
-    final bool isAlreadyCheckedIn = statusItem?.waktuMasuk != null;
+    final bool sudahAbsenMasuk = statusItem?.waktuMasuk != null;
+    final bool sudahAbsenPulang = statusItem?.waktuPulang != null;
 
     String displayStatus = 'Belum\nabsen';
     Color statusColor = const Color(0xFFE85A5A);
 
-    if (isAlreadyCheckedIn) {
-      displayStatus = statusItem?.statusMasuk ?? "TEPAT";
-      if (displayStatus.toUpperCase().contains('TERLAMBAT')) {
+    if (sudahAbsenPulang) {
+      displayStatus = statusItem?.statusPulang ?? "TEPAT";
+      final upper = displayStatus.toUpperCase();
+      if (upper.contains('CEPAT') || upper.contains('TERLAMBAT')) {
         statusColor = Colors.redAccent;
       } else {
         statusColor = const Color(0xFF57B87B);
       }
+    } else if (sudahAbsenMasuk) {
+      displayStatus = 'Belum\npulang';
+      statusColor = const Color(0xFFE85A5A);
     }
 
     final distanceInMeters = lokasiProvider.distanceToSelectedMeters;
     final isWithinRadius = lokasiProvider.isWithinSelectedRadius;
 
+    final bool canCheckout =
+        sudahAbsenMasuk && !sudahAbsenPulang && isWithinRadius;
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF57B87B),
+        backgroundColor: const Color(0xFFE85A5A),
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -241,7 +327,7 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
           onPressed: () => Navigator.maybePop(context),
         ),
         title: const Text(
-          'Absensi Kedatangan',
+          'Absensi Kepulangan',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
         centerTitle: true,
@@ -282,8 +368,8 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
                       ),
                       radius: selectedLocation.radius.toDouble(),
                       useRadiusInMeter: true,
-                      color: const Color(0xFF57B87B).withOpacity(0.2),
-                      borderColor: const Color(0xFF57B87B),
+                      color: const Color(0xFFE85A5A).withOpacity(0.18),
+                      borderColor: const Color(0xFFE85A5A),
                       borderStrokeWidth: 2,
                     ),
                   ],
@@ -344,22 +430,22 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
             right: 12,
             bottom: 24,
             child: AppButton(
-              text: isAlreadyCheckedIn
-                  ? 'Sudah Absen Masuk'
-                  : (selectedLocation == null
-                        ? 'Mencari Lokasi...'
-                        : (isWithinRadius
-                              ? 'Verifikasi Wajah'
-                              : 'Di Luar Radius (${distanceInMeters.toStringAsFixed(0)}m)')),
+              text: !sudahAbsenMasuk
+                  ? 'Belum Absen Masuk'
+                  : (sudahAbsenPulang
+                        ? 'Sudah Absen Pulang'
+                        : (selectedLocation == null
+                              ? 'Mencari Lokasi...'
+                              : (isWithinRadius
+                                    ? 'Verifikasi Wajah'
+                                    : 'Di Luar Radius (${distanceInMeters.toStringAsFixed(0)}m)'))),
               fullWidth: true,
               isLoading: absensiProvider.isLoading,
               manageInternalLoading: false,
-              backgroundColor: (isWithinRadius && !isAlreadyCheckedIn)
-                  ? const Color(0xFF57B87B)
+              backgroundColor: canCheckout
+                  ? const Color(0xFFE85A5A)
                   : Colors.grey.shade400,
-              onPressedAsync: (isWithinRadius && !isAlreadyCheckedIn)
-                  ? _onTapVerifikasiWajah
-                  : null,
+              onPressedAsync: canCheckout ? _onTapVerifikasiWajah : null,
             ),
           ),
         ],

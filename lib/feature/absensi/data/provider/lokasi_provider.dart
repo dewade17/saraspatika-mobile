@@ -1,21 +1,52 @@
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:saraspatika/core/services/api_service.dart';
+import 'package:saraspatika/core/services/location_service.dart';
 import 'package:saraspatika/feature/absensi/data/dto/lokasi_dto.dart';
 import 'package:saraspatika/feature/absensi/data/repository/lokasi_repository.dart';
 
+enum LokasiUiAction { none, openLocationSettings, openAppSettings }
+
+class LokasiUiEvent {
+  final String title;
+  final String message;
+  final LokasiUiAction action;
+
+  const LokasiUiEvent({
+    required this.title,
+    required this.message,
+    this.action = LokasiUiAction.none,
+  });
+}
+
 class LokasiProvider extends ChangeNotifier {
-  LokasiProvider({LokasiRepository? repository})
-    : _repository = repository ?? LokasiRepository();
+  LokasiProvider({
+    LokasiRepository? repository,
+    LocationService? locationService,
+  }) : _repository = repository ?? LokasiRepository(),
+       _locationService = locationService ?? const LocationService();
 
   final LokasiRepository _repository;
+  final LocationService _locationService;
 
   bool _loading = false;
+  bool _isLocating = false;
+
   String? _errorMessage;
+
   List<Lokasi> _locations = const <Lokasi>[];
   Lokasi? _selectedLocation;
   List<LokasiWithDistance> _nearestLocations = const <LokasiWithDistance>[];
 
+  GeoCoordinate? _currentCoordinate;
+  double _distanceToSelectedMeters = 0.0;
+  bool _isWithinSelectedRadius = false;
+
+  LokasiUiEvent? _uiEvent;
+
   bool get isLoading => _loading;
+  bool get isLocating => _isLocating;
+
   String? get errorMessage => _errorMessage;
 
   List<Lokasi> get locations => _locations;
@@ -28,9 +59,15 @@ class LokasiProvider extends ChangeNotifier {
 
   Lokasi? get nearestLocation => nearestLocationWithDistance?.lokasi;
 
-  void selectLocation(Lokasi? lokasi) {
-    _selectedLocation = lokasi;
-    notifyListeners();
+  GeoCoordinate? get currentCoordinate => _currentCoordinate;
+
+  double get distanceToSelectedMeters => _distanceToSelectedMeters;
+  bool get isWithinSelectedRadius => _isWithinSelectedRadius;
+
+  LokasiUiEvent? get uiEvent => _uiEvent;
+
+  void consumeUiEvent() {
+    _uiEvent = null;
   }
 
   void clearError() {
@@ -42,6 +79,26 @@ class LokasiProvider extends ChangeNotifier {
     if (_loading == v) return;
     _loading = v;
     notifyListeners();
+  }
+
+  void _recomputeProximity() {
+    final coord = _currentCoordinate;
+    final loc = _selectedLocation;
+
+    if (coord == null || loc == null) {
+      _distanceToSelectedMeters = 0.0;
+      _isWithinSelectedRadius = false;
+      return;
+    }
+
+    _distanceToSelectedMeters = Geolocator.distanceBetween(
+      coord.latitude,
+      coord.longitude,
+      loc.latitude,
+      loc.longitude,
+    );
+
+    _isWithinSelectedRadius = _distanceToSelectedMeters <= loc.radius;
   }
 
   String _friendlyError(Object e) {
@@ -64,7 +121,22 @@ class LokasiProvider extends ChangeNotifier {
       return 'Terjadi kesalahan jaringan/server.';
     }
 
+    if (e is LocationServiceException) {
+      return e.message;
+    }
+
     return 'Terjadi kesalahan: $e';
+  }
+
+  Future<void> openLocationSettings() =>
+      _locationService.openLocationSettings();
+
+  Future<void> openAppSettings() => _locationService.openAppSettings();
+
+  void selectLocation(Lokasi? lokasi) {
+    _selectedLocation = lokasi;
+    _recomputeProximity();
+    notifyListeners();
   }
 
   Future<LokasiResponse> fetchLocations({
@@ -99,6 +171,7 @@ class LokasiProvider extends ChangeNotifier {
     try {
       final lokasi = await _repository.fetchLocationById(idLokasi);
       _selectedLocation = lokasi;
+      _recomputeProximity();
       notifyListeners();
       return _selectedLocation;
     } catch (e) {
@@ -127,13 +200,11 @@ class LokasiProvider extends ChangeNotifier {
       );
       _nearestLocations = items;
 
-      // PERUBAHAN DI SINI:
-      // Selalu pilih item pertama (terdekat) sebagai selectedLocation
-      // setiap kali pencarian ini dipanggil.
       if (_nearestLocations.isNotEmpty) {
         _selectedLocation = _nearestLocations.first.lokasi;
       }
 
+      _recomputeProximity();
       notifyListeners();
       return _nearestLocations;
     } catch (e) {
@@ -141,6 +212,71 @@ class LokasiProvider extends ChangeNotifier {
       rethrow;
     } finally {
       _setLoading(false);
+    }
+  }
+
+  Future<void> refreshCurrentLocationAndNearest({int limit = 1}) async {
+    if (_isLocating) return;
+
+    _isLocating = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final coord = await _locationService.getVerifiedCoordinate();
+      _currentCoordinate = coord;
+
+      await fetchNearestLocations(
+        latitude: coord.latitude,
+        longitude: coord.longitude,
+        limit: limit,
+      );
+
+      _recomputeProximity();
+      notifyListeners();
+    } on LocationServicesDisabledException catch (e) {
+      _errorMessage = e.message;
+      _uiEvent = const LokasiUiEvent(
+        title: 'GPS tidak aktif',
+        message:
+            'Aktifkan Location Services (GPS) agar aplikasi bisa mengambil lokasi untuk absensi.',
+        action: LokasiUiAction.openLocationSettings,
+      );
+      notifyListeners();
+    } on LocationPermissionDeniedForeverException catch (e) {
+      _errorMessage = e.message;
+      _uiEvent = const LokasiUiEvent(
+        title: 'Izin lokasi dibutuhkan',
+        message:
+            'Izin lokasi ditolak permanen. Buka pengaturan aplikasi untuk mengaktifkannya.',
+        action: LokasiUiAction.openAppSettings,
+      );
+      notifyListeners();
+    } on LocationPermissionDeniedException catch (e) {
+      _errorMessage = e.message;
+      _uiEvent = const LokasiUiEvent(
+        title: 'Izin lokasi ditolak',
+        message: 'Izin lokasi diperlukan untuk melakukan absensi.',
+      );
+      notifyListeners();
+    } on MockLocationDetectedException catch (e) {
+      _errorMessage = e.message;
+      _uiEvent = const LokasiUiEvent(
+        title: 'Lokasi Palsu Terdeteksi',
+        message:
+            'Harap matikan aplikasi Fake GPS atau Mock Location untuk melakukan absensi.',
+      );
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = _friendlyError(e);
+      _uiEvent = LokasiUiEvent(
+        title: 'Gagal mengambil lokasi',
+        message: _errorMessage ?? 'Terjadi kesalahan.',
+      );
+      notifyListeners();
+    } finally {
+      _isLocating = false;
+      notifyListeners();
     }
   }
 }
