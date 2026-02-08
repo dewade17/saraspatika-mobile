@@ -49,7 +49,7 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
       _absensiProvider?.addListener(_onAbsensiProviderChanged);
       _lokasiProvider?.addListener(_onLokasiProviderChanged);
 
-      await _lokasiProvider?.refreshCurrentLocationAndNearest();
+      await _lokasiProvider?.refreshCurrentLocationAndNearest(silent: true);
       await _loadCachedLocationsIfNeeded();
 
       if (!mounted) return;

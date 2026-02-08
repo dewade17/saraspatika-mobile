@@ -62,6 +62,7 @@ class AbsensiProvider extends ChangeNotifier {
   Map<String, dynamic>? _lastCheckInResponse;
   Map<String, dynamic>? _lastCheckOutResponse;
   bool _hasLocalPendingCheckIn = false;
+  bool _hasLocalPendingCheckOut = false;
 
   AbsensiUiEvent? _uiEvent;
 
@@ -75,6 +76,7 @@ class AbsensiProvider extends ChangeNotifier {
   AbsensiUiEvent? get uiEvent => _uiEvent;
 
   bool get hasLocalPendingCheckIn => _hasLocalPendingCheckIn;
+  bool get hasLocalPendingCheckOut => _hasLocalPendingCheckOut;
 
   void consumeUiEvent() {
     _uiEvent = null;
@@ -142,14 +144,24 @@ class AbsensiProvider extends ChangeNotifier {
         resolvedId,
         DateTime.now(),
       );
+      final pendingCheckOut = await _db.getPendingCheckOutForUserOnDate(
+        resolvedId,
+        DateTime.now(),
+      );
 
       _hasLocalPendingCheckIn = pendingCheckIn != null;
+      _hasLocalPendingCheckOut = pendingCheckOut != null;
 
       final capturedAtRaw = pendingCheckIn?['captured_at']?.toString();
       final capturedAt = capturedAtRaw != null
           ? DateTime.tryParse(capturedAtRaw)?.toLocal()
           : null;
       final localAbsensiId = pendingCheckIn?['id']?.toString() ?? '';
+
+      final pendingCheckOutAtRaw = pendingCheckOut?['captured_at']?.toString();
+      final pendingCheckOutAt = pendingCheckOutAtRaw != null
+          ? DateTime.tryParse(pendingCheckOutAtRaw)?.toLocal()
+          : null;
 
       if (remoteStatus == null) {
         if (pendingCheckIn != null) {
@@ -170,21 +182,39 @@ class AbsensiProvider extends ChangeNotifier {
         return _status;
       }
 
-      if (remoteStatus.item?.waktuMasuk == null && pendingCheckIn != null) {
-        final mergedItem = AbsensiItem(
-          idAbsensi: remoteStatus.item?.idAbsensi.isNotEmpty == true
-              ? remoteStatus.item!.idAbsensi
-              : localAbsensiId,
-          faceVerifiedMasuk: remoteStatus.item?.faceVerifiedMasuk ?? false,
-          faceVerifiedPulang: remoteStatus.item?.faceVerifiedPulang ?? false,
-          statusMasuk: remoteStatus.item?.statusMasuk ?? 'PENDING',
-          statusPulang: remoteStatus.item?.statusPulang,
-          waktuMasuk: capturedAt ?? DateTime.now().toLocal(),
-          waktuPulang: remoteStatus.item?.waktuPulang,
-        );
-        _status = AbsensiStatus(ok: remoteStatus.ok, item: mergedItem);
-      } else {
+      final remoteItem = remoteStatus.item;
+      if (remoteItem == null) {
         _status = remoteStatus;
+      } else {
+        final shouldMergeCheckIn =
+            remoteItem.waktuMasuk == null && pendingCheckIn != null;
+        final shouldMergeCheckOut =
+            remoteItem.waktuPulang == null && pendingCheckOut != null;
+
+        if (shouldMergeCheckIn || shouldMergeCheckOut) {
+          final mergedItem = AbsensiItem(
+            idAbsensi: remoteItem.idAbsensi.isNotEmpty
+                ? remoteItem.idAbsensi
+                : localAbsensiId,
+            faceVerifiedMasuk: remoteItem.faceVerifiedMasuk,
+            faceVerifiedPulang: remoteItem.faceVerifiedPulang,
+            statusMasuk: shouldMergeCheckIn
+                ? (remoteItem.statusMasuk ?? 'PENDING')
+                : remoteItem.statusMasuk,
+            statusPulang: shouldMergeCheckOut
+                ? 'PENDING'
+                : remoteItem.statusPulang,
+            waktuMasuk: shouldMergeCheckIn
+                ? (capturedAt ?? DateTime.now().toLocal())
+                : remoteItem.waktuMasuk,
+            waktuPulang: shouldMergeCheckOut
+                ? (pendingCheckOutAt ?? DateTime.now().toLocal())
+                : remoteItem.waktuPulang,
+          );
+          _status = AbsensiStatus(ok: remoteStatus.ok, item: mergedItem);
+        } else {
+          _status = remoteStatus;
+        }
       }
       notifyListeners();
       return _status;

@@ -253,7 +253,10 @@ class LokasiProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> refreshCurrentLocationAndNearest({int limit = 1}) async {
+  Future<void> refreshCurrentLocationAndNearest({
+    int limit = 1,
+    bool silent = false,
+  }) async {
     if (_isLocating) return;
 
     _isLocating = true;
@@ -274,43 +277,53 @@ class LokasiProvider extends ChangeNotifier {
       notifyListeners();
     } on LocationServicesDisabledException catch (e) {
       _errorMessage = e.message;
-      _uiEvent = const LokasiUiEvent(
-        title: 'GPS tidak aktif',
-        message:
-            'Aktifkan Location Services (GPS) agar aplikasi bisa mengambil lokasi untuk absensi.',
-        action: LokasiUiAction.openLocationSettings,
-      );
+      if (!silent) {
+        _uiEvent = const LokasiUiEvent(
+          title: 'GPS tidak aktif',
+          message:
+              'Aktifkan Location Services (GPS) agar aplikasi bisa mengambil lokasi untuk absensi.',
+          action: LokasiUiAction.openLocationSettings,
+        );
+      }
       notifyListeners();
     } on LocationPermissionDeniedForeverException catch (e) {
       _errorMessage = e.message;
-      _uiEvent = const LokasiUiEvent(
-        title: 'Izin lokasi dibutuhkan',
-        message:
-            'Izin lokasi ditolak permanen. Buka pengaturan aplikasi untuk mengaktifkannya.',
-        action: LokasiUiAction.openAppSettings,
-      );
+      if (!silent) {
+        _uiEvent = const LokasiUiEvent(
+          title: 'Izin lokasi dibutuhkan',
+          message:
+              'Izin lokasi ditolak permanen. Buka pengaturan aplikasi untuk mengaktifkannya.',
+          action: LokasiUiAction.openAppSettings,
+        );
+      }
       notifyListeners();
     } on LocationPermissionDeniedException catch (e) {
       _errorMessage = e.message;
-      _uiEvent = const LokasiUiEvent(
-        title: 'Izin lokasi ditolak',
-        message: 'Izin lokasi diperlukan untuk melakukan absensi.',
-      );
+      if (!silent) {
+        _uiEvent = const LokasiUiEvent(
+          title: 'Izin lokasi ditolak',
+          message: 'Izin lokasi diperlukan untuk melakukan absensi.',
+        );
+      }
       notifyListeners();
     } on MockLocationDetectedException catch (e) {
       _errorMessage = e.message;
-      _uiEvent = const LokasiUiEvent(
-        title: 'Lokasi Palsu Terdeteksi',
-        message:
-            'Harap matikan aplikasi Fake GPS atau Mock Location untuk melakukan absensi.',
-      );
+      if (!silent) {
+        _uiEvent = const LokasiUiEvent(
+          title: 'Lokasi Palsu Terdeteksi',
+          message:
+              'Harap matikan aplikasi Fake GPS atau Mock Location untuk melakukan absensi.',
+        );
+      }
       notifyListeners();
     } catch (e) {
       _errorMessage = _friendlyError(e);
-      _uiEvent = LokasiUiEvent(
-        title: 'Gagal mengambil lokasi',
-        message: _errorMessage ?? 'Terjadi kesalahan.',
-      );
+      if (!silent) {
+        _uiEvent = LokasiUiEvent(
+          title: 'Gagal mengambil lokasi',
+          message: _errorMessage ?? 'Terjadi kesalahan.',
+        );
+      }
       notifyListeners();
     } finally {
       _isLocating = false;

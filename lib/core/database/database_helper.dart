@@ -138,6 +138,33 @@ class DatabaseHelper {
     return null;
   }
 
+  Future<Map<String, dynamic>?> getPendingCheckOutForUserOnDate(
+    String userId,
+    DateTime date,
+  ) async {
+    final db = await instance.database;
+    final rows = await db.query(
+      'offline_attendance',
+      where: 'status = ? AND user_id = ? AND type = ?',
+      whereArgs: [0, userId, 'checkout'],
+      orderBy: 'captured_at DESC',
+    );
+
+    final localDate = date.toLocal();
+    for (final row in rows) {
+      final capturedAtRaw = row['captured_at']?.toString();
+      if (capturedAtRaw == null) continue;
+      final capturedAt = DateTime.tryParse(capturedAtRaw);
+      if (capturedAt == null) continue;
+      final localCapturedAt = capturedAt.toLocal();
+      if (DateUtils.isSameDay(localCapturedAt, localDate)) {
+        return row;
+      }
+    }
+
+    return null;
+  }
+
   Future<int> deleteAttendance(String id) async {
     // Parameter ID sekarang TEXT
     final db = await instance.database;

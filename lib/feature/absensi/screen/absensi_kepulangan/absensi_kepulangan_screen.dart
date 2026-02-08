@@ -48,7 +48,7 @@ class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
       _absensiProvider?.addListener(_onAbsensiProviderChanged);
       _lokasiProvider?.addListener(_onLokasiProviderChanged);
 
-      await _lokasiProvider?.refreshCurrentLocationAndNearest();
+      await _lokasiProvider?.refreshCurrentLocationAndNearest(silent: true);
       await _loadCachedLocationsIfNeeded();
 
       if (!mounted) return;
@@ -219,7 +219,9 @@ class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
     final statusItem = absensiProvider.status?.item;
     final absensiId = statusItem?.idAbsensi.trim();
     final sudahAbsenMasuk = statusItem?.waktuMasuk != null;
-    final sudahAbsenPulang = statusItem?.waktuPulang != null;
+    final sudahAbsenPulang =
+        statusItem?.waktuPulang != null ||
+        absensiProvider.hasLocalPendingCheckOut;
     final hasPendingCheckIn = absensiProvider.hasLocalPendingCheckIn;
 
     if (!sudahAbsenMasuk) {
@@ -314,7 +316,9 @@ class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
 
     final statusItem = absensiProvider.status?.item;
     final bool sudahAbsenMasuk = statusItem?.waktuMasuk != null;
-    final bool sudahAbsenPulang = statusItem?.waktuPulang != null;
+    final bool sudahAbsenPulang =
+        statusItem?.waktuPulang != null ||
+        absensiProvider.hasLocalPendingCheckOut;
     final bool hasPendingCheckIn = absensiProvider.hasLocalPendingCheckIn;
 
     String displayStatus = 'Belum\nabsen';
