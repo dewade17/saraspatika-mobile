@@ -19,6 +19,11 @@ class JadwalShiftProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   JadwalShift? get todayShift => _todayShift;
 
+  void setCachedTodayShift(JadwalShift? shift) {
+    _todayShift = shift;
+    notifyListeners();
+  }
+
   void clearError() {
     _errorMessage = null;
     notifyListeners();

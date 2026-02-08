@@ -169,8 +169,8 @@ class OfflineProvider extends ChangeNotifier {
     String? absensiId,
   }) async {
     final endpoint = type == 'checkin'
-        ? "${Endpoints.baseURL}/absensi/checkin"
-        : "${Endpoints.baseURL}/absensi/checkout";
+        ? "${Endpoints.faceBaseURL}/absensi/checkin"
+        : "${Endpoints.faceBaseURL}/absensi/checkout";
 
     final fields = <String, String>{
       'user_id': userId,

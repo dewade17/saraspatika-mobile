@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:quickalert/quickalert.dart';
+import 'package:saraspatika/core/database/database_helper.dart';
 import 'package:saraspatika/core/shared_widgets/app_button_widget.dart';
 import 'package:saraspatika/feature/absensi/data/provider/offline_provider.dart';
 import 'package:saraspatika/feature/absensi/data/dto/jadwal_shift.dart';
@@ -48,6 +49,7 @@ class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
       _lokasiProvider?.addListener(_onLokasiProviderChanged);
 
       await _lokasiProvider?.refreshCurrentLocationAndNearest();
+      await _loadCachedLocationsIfNeeded();
 
       if (!mounted) return;
 
@@ -58,12 +60,40 @@ class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
           _absensiProvider!.fetchStatus(),
         ]);
       } catch (e) {
+        await _loadCachedShiftIfNeeded();
         if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Gagal memuat data: $e')));
+        if (jadwalProvider.todayShift == null) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Gagal memuat data: $e')));
+        }
       }
     });
+  }
+
+  Future<void> _loadCachedLocationsIfNeeded() async {
+    final lokasiProvider = _lokasiProvider;
+    if (lokasiProvider == null) return;
+
+    if (lokasiProvider.selectedLocation != null) return;
+
+    final cachedLocations = await DatabaseHelper.instance.getCachedLocations();
+    if (cachedLocations.isEmpty) return;
+
+    lokasiProvider.applyCachedLocations(
+      cachedLocations,
+      coordinate: lokasiProvider.currentCoordinate,
+    );
+  }
+
+  Future<void> _loadCachedShiftIfNeeded() async {
+    final jadwalProvider = context.read<JadwalShiftProvider>();
+    if (jadwalProvider.todayShift != null) return;
+
+    final cachedShift = await DatabaseHelper.instance.getCachedTodayShift();
+    if (cachedShift == null) return;
+
+    jadwalProvider.setCachedTodayShift(cachedShift);
   }
 
   @override

@@ -139,6 +139,44 @@ class LokasiProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void applyCachedLocations(
+    List<Lokasi> locations, {
+    GeoCoordinate? coordinate,
+  }) {
+    _locations = locations;
+    if (coordinate != null) {
+      _currentCoordinate = coordinate;
+    }
+
+    final coord = _currentCoordinate;
+    if (coord != null && locations.isNotEmpty) {
+      final sorted =
+          locations
+              .map(
+                (lokasi) => LokasiWithDistance(
+                  lokasi: lokasi,
+                  distanceMeters: Geolocator.distanceBetween(
+                    coord.latitude,
+                    coord.longitude,
+                    lokasi.latitude,
+                    lokasi.longitude,
+                  ),
+                ),
+              )
+              .toList()
+            ..sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
+
+      _nearestLocations = sorted;
+      _selectedLocation = sorted.first.lokasi;
+    } else {
+      _nearestLocations = const <LokasiWithDistance>[];
+      _selectedLocation = locations.isNotEmpty ? locations.first : null;
+    }
+
+    _recomputeProximity();
+    notifyListeners();
+  }
+
   Future<LokasiResponse> fetchLocations({
     String? query,
     int page = 1,

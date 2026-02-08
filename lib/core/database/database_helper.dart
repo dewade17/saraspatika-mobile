@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart'; // Import package uuid
+import 'package:saraspatika/feature/absensi/data/dto/jadwal_shift.dart';
+import 'package:saraspatika/feature/absensi/data/dto/lokasi_dto.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -24,8 +27,9 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2, 
+      version: 3,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
@@ -42,6 +46,37 @@ class DatabaseHelper {
         image_path TEXT NOT NULL,
         captured_at TEXT NOT NULL,    -- Timestamp ISO8601 (Penting!)
         status INTEGER DEFAULT 0      -- 0: Pending, 1: Synced
+      )
+    ''');
+    await _createCachedTables(db);
+  }
+
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 3) {
+      await _createCachedTables(db);
+    }
+  }
+
+  Future<void> _createCachedTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS cached_locations (
+        id_lokasi TEXT PRIMARY KEY,
+        nama_lokasi TEXT NOT NULL,
+        latitude REAL NOT NULL,
+        longitude REAL NOT NULL,
+        radius INTEGER NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS cached_shifts (
+        id_jadwal_shift TEXT PRIMARY KEY,
+        id_user TEXT NOT NULL,
+        id_pola_kerja TEXT NOT NULL,
+        tanggal TEXT NOT NULL,
+        nama_pola_kerja TEXT NOT NULL,
+        jam_mulai_kerja TEXT NOT NULL,
+        jam_selesai_kerja TEXT NOT NULL
       )
     ''');
   }
@@ -61,12 +96,16 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getPendingAttendance() async {
     final db = await instance.database;
-    return await db.query(
+    final result = await db.query(
       'offline_attendance',
       where: 'status = ?',
       whereArgs: [0],
-      orderBy: 'captured_at ASC',
     );
+
+    // Tambahkan ini untuk melihat data di debug console
+    debugPrint('Data Offline di SQLite: $result');
+
+    return result;
   }
 
   Future<int> deleteAttendance(String id) async {
@@ -76,6 +115,75 @@ class DatabaseHelper {
       'offline_attendance',
       where: 'id = ?',
       whereArgs: [id],
+    );
+  }
+
+  Future<void> cacheLocations(List<Lokasi> locations) async {
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      await txn.delete('cached_locations');
+      final batch = txn.batch();
+      for (final lokasi in locations) {
+        batch.insert('cached_locations', {
+          'id_lokasi': lokasi.idLokasi,
+          'nama_lokasi': lokasi.namaLokasi,
+          'latitude': lokasi.latitude,
+          'longitude': lokasi.longitude,
+          'radius': lokasi.radius,
+        });
+      }
+      await batch.commit(noResult: true);
+    });
+  }
+
+  Future<List<Lokasi>> getCachedLocations() async {
+    final db = await instance.database;
+    final rows = await db.query('cached_locations');
+    return rows
+        .map(
+          (row) => Lokasi(
+            idLokasi: row['id_lokasi']?.toString() ?? '',
+            namaLokasi: row['nama_lokasi']?.toString() ?? '',
+            latitude: (row['latitude'] as num?)?.toDouble() ?? 0.0,
+            longitude: (row['longitude'] as num?)?.toDouble() ?? 0.0,
+            radius: (row['radius'] as num?)?.toInt() ?? 0,
+          ),
+        )
+        .toList();
+  }
+
+  Future<void> cacheTodayShift(JadwalShift? shift) async {
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      await txn.delete('cached_shifts');
+      if (shift == null) return;
+      await txn.insert('cached_shifts', {
+        'id_jadwal_shift': shift.idJadwalShift,
+        'id_user': shift.idUser,
+        'id_pola_kerja': shift.idPolaKerja,
+        'tanggal': shift.tanggal.toIso8601String(),
+        'nama_pola_kerja': shift.namaPolaKerja,
+        'jam_mulai_kerja': shift.jamMulaiKerja.toIso8601String(),
+        'jam_selesai_kerja': shift.jamSelesaiKerja.toIso8601String(),
+      });
+    });
+  }
+
+  Future<JadwalShift?> getCachedTodayShift() async {
+    final db = await instance.database;
+    final rows = await db.query('cached_shifts', limit: 1);
+    if (rows.isEmpty) return null;
+    final row = rows.first;
+    return JadwalShift(
+      idJadwalShift: row['id_jadwal_shift']?.toString() ?? '',
+      idUser: row['id_user']?.toString() ?? '',
+      idPolaKerja: row['id_pola_kerja']?.toString() ?? '',
+      tanggal: DateTime.parse(row['tanggal']?.toString() ?? ''),
+      namaPolaKerja: row['nama_pola_kerja']?.toString() ?? '',
+      jamMulaiKerja: DateTime.parse(row['jam_mulai_kerja']?.toString() ?? ''),
+      jamSelesaiKerja: DateTime.parse(
+        row['jam_selesai_kerja']?.toString() ?? '',
+      ),
     );
   }
 }

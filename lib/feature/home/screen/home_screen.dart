@@ -1,8 +1,12 @@
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:saraspatika/core/constants/colors.dart';
 import 'package:saraspatika/feature/home/screen/widget/button_app_bar.dart';
+import 'package:saraspatika/feature/absensi/data/provider/jadwal_shift_provider.dart';
+import 'package:saraspatika/feature/absensi/data/provider/lokasi_provider.dart';
+import 'package:saraspatika/core/database/database_helper.dart';
 import 'package:saraspatika/feature/home/screen/widget/content_riwayat_absensi.dart';
 import 'package:saraspatika/feature/home/screen/widget/header_user_appbar.dart';
 import 'package:saraspatika/feature/izin_sakit_cuti/screen/izin_sakit_cuti.dart';
@@ -71,15 +75,43 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
       context.read<UserProfileProvider>().fetchCurrentUser();
       final offlineProvider = context.read<OfflineProvider>();
       offlineProvider.syncPendingData();
+      _cacheMasterDataIfOnline();
       _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
         results,
       ) {
         final hasInternet = !results.contains(ConnectivityResult.none);
         if (hasInternet) {
           offlineProvider.syncPendingData();
+          _cacheMasterDataIfOnline();
         }
       });
     });
+  }
+
+  Future<void> _cacheMasterDataIfOnline() async {
+    final connectivityResult = await Connectivity().checkConnectivity();
+    final hasInternet = !connectivityResult.contains(ConnectivityResult.none);
+    if (!hasInternet) return;
+
+    final lokasiProvider = context.read<LokasiProvider>();
+    final jadwalProvider = context.read<JadwalShiftProvider>();
+    final db = DatabaseHelper.instance;
+
+    try {
+      final lokasiResponse = await lokasiProvider.fetchLocations(
+        pageSize: 1000,
+      );
+      await db.cacheLocations(lokasiResponse.items);
+    } catch (e) {
+      debugPrint('Gagal cache lokasi: $e');
+    }
+
+    try {
+      final todayShift = await jadwalProvider.fetchTodayShift();
+      await db.cacheTodayShift(todayShift);
+    } catch (e) {
+      debugPrint('Gagal cache jadwal shift: $e');
+    }
   }
 
   Future<void> _profileRefresh() async {
