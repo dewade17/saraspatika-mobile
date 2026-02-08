@@ -196,8 +196,9 @@ class DatabaseHelper {
     return await db.update(
       'offline_attendance',
       {'absensi_id': newServerId},
-      where: 'type = ? AND status = ? AND user_id = ? AND absensi_id = ?',
-      whereArgs: ['checkout', 0, userId, oldLocalId],
+      where:
+          'type = ? AND status = ? AND user_id = ? AND (absensi_id = ? OR absensi_id IS NULL OR TRIM(absensi_id) = ?)',
+      whereArgs: ['checkout', 0, userId, oldLocalId, ''],
     );
   }
 

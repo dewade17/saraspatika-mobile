@@ -45,6 +45,10 @@ class OfflineProvider extends ChangeNotifier {
           capturedAt: capturedAt,
           locationId: locationId,
           absensiId: absensiId,
+          correlationId: _buildDirectCorrelationId(
+            type: type,
+            absensiId: absensiId,
+          ),
         );
         debugPrint("Berhasil kirim langsung (Online)");
       } catch (e) {
@@ -160,16 +164,24 @@ class OfflineProvider extends ChangeNotifier {
             capturedAt: latestData['captured_at']?.toString() ?? '',
             locationId: latestData['location_id']?.toString(),
             absensiId: latestData['absensi_id']?.toString(),
-            correlationId: localId,
+            correlationId: _buildSyncCorrelationId(
+              localId: localId,
+              type: latestData['type']?.toString(),
+              absensiId: latestData['absensi_id']?.toString(),
+            ),
           );
 
           if (latestData['type']?.toString() == 'checkin') {
             final serverAbsensiId = _extractAbsensiId(response);
             if (serverAbsensiId != null && serverAbsensiId.isNotEmpty) {
-              await DatabaseHelper.instance.updatePendingCheckoutId(
+              await _db.updatePendingCheckoutId(
                 latestData['user_id']?.toString() ?? '',
                 localId,
                 serverAbsensiId,
+              );
+            } else {
+              debugPrint(
+                'checkin sync berhasil tapi absensi_id tidak ditemukan di response: $response',
               );
             }
           }
@@ -221,15 +233,68 @@ class OfflineProvider extends ChangeNotifier {
     return double.tryParse(value?.toString() ?? '') ?? 0.0;
   }
 
-  String? _extractAbsensiId(Map<String, dynamic> response) {
-    final direct = response['absensi_id']?.toString();
-    if (direct != null && direct.isNotEmpty) return direct;
+  String? _buildDirectCorrelationId({required String type, String? absensiId}) {
+    if (type != 'checkout') return null;
+    final checkoutReference = absensiId?.trim() ?? '';
+    if (checkoutReference.isEmpty) return null;
+    return checkoutReference;
+  }
 
-    final data = response['data'];
-    if (data is Map) {
-      final nested = data['absensi_id']?.toString();
-      if (nested != null && nested.isNotEmpty) return nested;
+  String _buildSyncCorrelationId({
+    required String localId,
+    required String? type,
+    required String? absensiId,
+  }) {
+    if (type == 'checkout') {
+      final checkoutReference = absensiId?.trim() ?? '';
+      if (checkoutReference.isNotEmpty) {
+        return checkoutReference;
+      }
     }
+    return localId;
+  }
+
+  String? _extractAbsensiId(Map<String, dynamic> response) {
+    return _findFirstStringByKeys(
+      node: response,
+      keys: const ['absensi_id', 'id_absensi'],
+    );
+  }
+
+  String? _findFirstStringByKeys({
+    required dynamic node,
+    required List<String> keys,
+  }) {
+    if (node is Map) {
+      final map = Map<String, dynamic>.from(
+        node.map((key, value) => MapEntry(key.toString(), value)),
+      );
+
+      for (final key in keys) {
+        final value = map[key]?.toString().trim();
+        if (value != null && value.isNotEmpty) {
+          return value;
+        }
+      }
+
+      for (final value in map.values) {
+        final nested = _findFirstStringByKeys(node: value, keys: keys);
+        if (nested != null && nested.isNotEmpty) {
+          return nested;
+        }
+      }
+      return null;
+    }
+
+    if (node is Iterable) {
+      for (final value in node) {
+        final nested = _findFirstStringByKeys(node: value, keys: keys);
+        if (nested != null && nested.isNotEmpty) {
+          return nested;
+        }
+      }
+    }
+
     return null;
   }
 
