@@ -136,18 +136,60 @@ class OfflineProvider extends ChangeNotifier {
 
     for (var data in pendingData) {
       try {
-        await _sendToApi(
-          userId: data['user_id'],
-          type: data['type'],
-          lat: data['lat'],
-          lng: data['lng'],
-          imagePath: data['image_path'],
-          capturedAt: data['captured_at'],
-          locationId: data['location_id'],
-          absensiId: data['absensi_id'],
+        var latestData = data;
+        if (data['type'] == 'checkout') {
+          try {
+            final db = await _db.database;
+            final rows = await db.query(
+              'offline_attendance',
+              where: 'id = ?',
+              whereArgs: [data['id']],
+              limit: 1,
+            );
+            if (rows.isNotEmpty) {
+              latestData = rows.first;
+            }
+          } catch (e) {
+            debugPrint("Gagal memuat ulang data checkout ID ${data['id']}: $e");
+          }
+        }
+
+        final response = await _sendToApi(
+          userId: latestData['user_id'],
+          type: latestData['type'],
+          lat: latestData['lat'],
+          lng: latestData['lng'],
+          imagePath: latestData['image_path'],
+          capturedAt: latestData['captured_at'],
+          locationId: latestData['location_id'],
+          absensiId: latestData['absensi_id'],
         );
+
+        if (latestData['type'] == 'checkin') {
+          try {
+            final responseMap = response is Map<String, dynamic>
+                ? response
+                : response is Map
+                ? Map<String, dynamic>.from(response)
+                : null;
+            final serverAbsensiId = responseMap?['absensi_id']?.toString();
+            if (serverAbsensiId != null &&
+                serverAbsensiId.isNotEmpty &&
+                latestData['id'] != null) {
+              await _db.updatePendingCheckoutId(
+                latestData['user_id'],
+                latestData['id'].toString(),
+                serverAbsensiId,
+              );
+            }
+          } catch (e) {
+            debugPrint(
+              "Gagal update absensi_id checkout untuk ID ${latestData['id']}: $e",
+            );
+          }
+        }
         // Hapus dari SQLite jika sukses terkirim
-        await _db.deleteAttendance(data['id']);
+        await _db.deleteAttendance(latestData['id']);
       } catch (e) {
         debugPrint("Gagal sinkronisasi ID ${data['id']}: $e");
       }
@@ -158,7 +200,7 @@ class OfflineProvider extends ChangeNotifier {
   }
 
   // Helper untuk memanggil API Flask Anda
-  Future<void> _sendToApi({
+  Future<dynamic> _sendToApi({
     required String userId,
     required String type,
     required double lat,
@@ -189,7 +231,7 @@ class OfflineProvider extends ChangeNotifier {
 
     final length = await imageFile.length();
 
-    await _api.multipart(
+    return await _api.multipart(
       endpoint,
       fields: fields,
       files: [

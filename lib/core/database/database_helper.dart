@@ -175,6 +175,20 @@ class DatabaseHelper {
     );
   }
 
+  Future<int> updatePendingCheckoutId(
+    String userId,
+    String oldLocalId,
+    String newServerId,
+  ) async {
+    final db = await instance.database;
+    return await db.update(
+      'offline_attendance',
+      {'absensi_id': newServerId},
+      where: 'type = ? AND status = ? AND user_id = ? AND absensi_id = ?',
+      whereArgs: ['checkout', 0, userId, oldLocalId],
+    );
+  }
+
   Future<void> cacheLocations(List<Lokasi> locations) async {
     final db = await instance.database;
     await db.transaction((txn) async {
