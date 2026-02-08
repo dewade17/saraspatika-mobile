@@ -131,35 +131,63 @@ class AbsensiProvider extends ChangeNotifier {
       final resolvedId = (userId != null && userId.trim().isNotEmpty)
           ? userId.trim()
           : await _resolveStoredUserId();
-      final data = await _repository.fetchStatus(userId: resolvedId);
-      _hasLocalPendingCheckIn = false;
+      AbsensiStatus? remoteStatus;
+      try {
+        remoteStatus = await _repository.fetchStatus(userId: resolvedId);
+      } catch (e) {
+        _errorMessage = _friendlyError(e);
+      }
 
       final pendingCheckIn = await _db.getPendingCheckInForUserOnDate(
         resolvedId,
         DateTime.now(),
       );
 
-      if (data.item?.waktuMasuk == null && pendingCheckIn != null) {
-        final capturedAtRaw = pendingCheckIn['captured_at']?.toString();
-        final capturedAt = capturedAtRaw != null
-            ? DateTime.tryParse(capturedAtRaw)?.toLocal()
-            : null;
+      _hasLocalPendingCheckIn = pendingCheckIn != null;
+
+      final capturedAtRaw = pendingCheckIn?['captured_at']?.toString();
+      final capturedAt = capturedAtRaw != null
+          ? DateTime.tryParse(capturedAtRaw)?.toLocal()
+          : null;
+      final localAbsensiId = pendingCheckIn?['id']?.toString() ?? '';
+
+      if (remoteStatus == null) {
+        if (pendingCheckIn != null) {
+          final localItem = AbsensiItem(
+            idAbsensi: localAbsensiId,
+            faceVerifiedMasuk: false,
+            faceVerifiedPulang: false,
+            statusMasuk: 'PENDING',
+            statusPulang: null,
+            waktuMasuk: capturedAt ?? DateTime.now().toLocal(),
+            waktuPulang: null,
+          );
+          _status = AbsensiStatus(ok: true, item: localItem);
+        } else {
+          _status = null;
+        }
+        notifyListeners();
+        return _status;
+      }
+
+      if (remoteStatus.item?.waktuMasuk == null && pendingCheckIn != null) {
         final mergedItem = AbsensiItem(
-          idAbsensi: data.item?.idAbsensi ?? '',
-          faceVerifiedMasuk: data.item?.faceVerifiedMasuk ?? false,
-          faceVerifiedPulang: data.item?.faceVerifiedPulang ?? false,
-          statusMasuk: data.item?.statusMasuk ?? 'PENDING',
-          statusPulang: data.item?.statusPulang,
+          idAbsensi: remoteStatus.item?.idAbsensi.isNotEmpty == true
+              ? remoteStatus.item!.idAbsensi
+              : localAbsensiId,
+          faceVerifiedMasuk: remoteStatus.item?.faceVerifiedMasuk ?? false,
+          faceVerifiedPulang: remoteStatus.item?.faceVerifiedPulang ?? false,
+          statusMasuk: remoteStatus.item?.statusMasuk ?? 'PENDING',
+          statusPulang: remoteStatus.item?.statusPulang,
           waktuMasuk: capturedAt ?? DateTime.now().toLocal(),
-          waktuPulang: data.item?.waktuPulang,
+          waktuPulang: remoteStatus.item?.waktuPulang,
         );
-        _status = AbsensiStatus(ok: data.ok, item: mergedItem);
-        _hasLocalPendingCheckIn = true;
+        _status = AbsensiStatus(ok: remoteStatus.ok, item: mergedItem);
       } else {
-        _status = data;
+        _status = remoteStatus;
       }
       notifyListeners();
-      return data;
+      return _status;
     } catch (e) {
       _errorMessage = _friendlyError(e);
       rethrow;
