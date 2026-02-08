@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:saraspatika/feature/absensi/screen/face_detection/face_detection_screen.dart';
 import 'package:saraspatika/feature/registrasi_wajah/screen/registrasi_wajah.dart';
+import 'package:saraspatika/feature/request_wajah/screen/home_request_wajah.dart';
 
 class SectionSettingScreen extends StatefulWidget {
   const SectionSettingScreen({super.key});
@@ -45,27 +46,7 @@ class _SectionSettingScreenState extends State<SectionSettingScreen> {
             ),
             onTap: () => (Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const RegistrasiWajah()),
-            )),
-          ),
-        ),
-        Card(
-          elevation: 0.5,
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: ListTile(
-            leading: const Icon(Icons.face, color: Colors.orange),
-            title: const Text("Face Detection", style: TextStyle(fontSize: 15)),
-            trailing: const Icon(
-              Icons.arrow_forward_ios,
-              size: 14,
-              color: Colors.grey,
-            ),
-            onTap: () => (Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const FaceDetectionScreen()),
+              MaterialPageRoute(builder: (_) => const HomeRequestWajah()),
             )),
           ),
         ),

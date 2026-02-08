@@ -265,4 +265,54 @@ class AbsensiProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> submitCheckOutWithFace({
+    required File imageFile,
+    required String absensiId,
+    required String? locationId,
+    required double? lat,
+    required double? lng,
+  }) async {
+    if (locationId == null ||
+        locationId.trim().isEmpty ||
+        absensiId.trim().isEmpty ||
+        lat == null ||
+        lng == null) {
+      _uiEvent = AbsensiUiEvent.error(
+        'Lokasi absensi belum dipilih atau koordinat belum tersedia.',
+      );
+      notifyListeners();
+      return;
+    }
+
+    _uiEvent = AbsensiUiEvent.loading();
+    notifyListeners();
+
+    try {
+      await checkOut(
+        request: CheckOutRequest(
+          userId: '',
+          absensiId: absensiId.trim(),
+          locationId: locationId.trim(),
+          lat: lat,
+          lng: lng,
+          capturedAt: DateTime.now().toIso8601String(),
+        ),
+        imageFile: imageFile,
+      );
+
+      final waktuPulang =
+          _status?.item?.waktuPulang?.toLocal() ?? DateTime.now().toLocal();
+      final jamPulang = DateFormat('HH:mm').format(waktuPulang);
+
+      _uiEvent = AbsensiUiEvent.success(
+        'You have successfully checked out at $jamPulang.',
+      );
+      notifyListeners();
+    } catch (e) {
+      final msg = _errorMessage ?? _friendlyError(e);
+      _uiEvent = AbsensiUiEvent.error(msg);
+      notifyListeners();
+    }
+  }
 }

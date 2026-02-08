@@ -31,7 +31,7 @@ class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
   AbsensiProvider? _absensiProvider;
   LokasiProvider? _lokasiProvider;
 
-  bool _loadingDialogVisible = false;
+  bool _absensiLoadingDialogVisible = false;
   double? _lastCenteredLat;
   double? _lastCenteredLng;
 
@@ -44,7 +44,7 @@ class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
 
       _absensiProvider = context.read<AbsensiProvider>();
       _lokasiProvider = context.read<LokasiProvider>();
-
+      _absensiProvider?.addListener(_onAbsensiProviderChanged);
       _lokasiProvider?.addListener(_onLokasiProviderChanged);
 
       await _lokasiProvider?.refreshCurrentLocationAndNearest();
@@ -68,6 +68,7 @@ class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
 
   @override
   void dispose() {
+    _absensiProvider?.removeListener(_onAbsensiProviderChanged);
     _lokasiProvider?.removeListener(_onLokasiProviderChanged);
     super.dispose();
   }
@@ -124,25 +125,57 @@ class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
     );
   }
 
-  Future<void> _showLoading(String title, String message) async {
+  void _onAbsensiProviderChanged() {
     if (!mounted) return;
-    if (_loadingDialogVisible) return;
+    final absensiProvider = _absensiProvider;
+    if (absensiProvider == null) return;
 
-    _loadingDialogVisible = true;
+    final event = absensiProvider.uiEvent;
+    if (event == null) return;
+
+    absensiProvider.consumeUiEvent();
+
+    if (event.type == AbsensiUiEventType.loading) {
+      if (_absensiLoadingDialogVisible) return;
+      _absensiLoadingDialogVisible = true;
+
+      QuickAlert.show(
+        context: context,
+        type: QuickAlertType.loading,
+        title: event.title,
+        text: event.message,
+        barrierDismissible: false,
+      );
+      return;
+    }
+
+    if (_absensiLoadingDialogVisible) {
+      _absensiLoadingDialogVisible = false;
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+
+    if (event.type == AbsensiUiEventType.success) {
+      QuickAlert.show(
+        context: context,
+        type: QuickAlertType.success,
+        title: event.title,
+        text: event.message,
+        confirmBtnText: event.confirmText ?? 'OK',
+        onConfirmBtnTap: () {
+          Navigator.of(context, rootNavigator: true).pop();
+          Navigator.of(context).maybePop();
+        },
+      );
+      return;
+    }
+
     QuickAlert.show(
       context: context,
-      type: QuickAlertType.loading,
-      title: title,
-      text: message,
-      barrierDismissible: false,
+      type: QuickAlertType.error,
+      title: event.title,
+      text: event.message,
+      confirmBtnText: event.confirmText ?? 'Coba Lagi',
     );
-  }
-
-  void _hideLoadingIfVisible() {
-    if (!mounted) return;
-    if (!_loadingDialogVisible) return;
-    _loadingDialogVisible = false;
-    Navigator.of(context, rootNavigator: true).pop();
   }
 
   Future<void> _onTapRecenter() async {
@@ -224,59 +257,13 @@ class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
 
     if (!mounted || photo == null) return;
 
-    await _showLoading(
-      'Memproses...',
-      'Mengirim data absensi dan memverifikasi wajah.',
+    await absensiProvider.submitCheckOutWithFace(
+      imageFile: photo,
+      absensiId: absensiId,
+      locationId: selectedLocation.idLokasi,
+      lat: coord.latitude,
+      lng: coord.longitude,
     );
-
-    try {
-      await absensiProvider.checkOut(
-        request: CheckOutRequest(
-          userId: '',
-          absensiId: absensiId,
-          locationId: selectedLocation.idLokasi,
-          lat: coord.latitude,
-          lng: coord.longitude,
-          capturedAt: DateTime.now().toIso8601String(),
-        ),
-        imageFile: photo,
-      );
-
-      if (!mounted) return;
-      _hideLoadingIfVisible();
-
-      final waktuPulang =
-          absensiProvider.status?.item?.waktuPulang?.toLocal() ??
-          DateTime.now().toLocal();
-      final jamPulang = DateFormat('HH:mm').format(waktuPulang);
-
-      QuickAlert.show(
-        context: context,
-        type: QuickAlertType.success,
-        title: 'Berhasil!',
-        text: 'Anda berhasil melakukan check-out pada pukul $jamPulang.',
-        confirmBtnText: 'OK',
-        onConfirmBtnTap: () {
-          Navigator.of(context, rootNavigator: true).pop();
-          Navigator.of(context).maybePop();
-        },
-      );
-    } catch (e) {
-      if (!mounted) return;
-      _hideLoadingIfVisible();
-
-      final msg =
-          absensiProvider.errorMessage ??
-          e.toString().replaceFirst('Exception: ', '');
-
-      QuickAlert.show(
-        context: context,
-        type: QuickAlertType.error,
-        title: 'Terjadi Kesalahan',
-        text: msg,
-        confirmBtnText: 'OK',
-      );
-    }
   }
 
   @override
