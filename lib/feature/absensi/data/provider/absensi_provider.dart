@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
+import 'package:saraspatika/core/database/database_helper.dart';
 import 'package:saraspatika/core/services/api_service.dart';
 import 'package:saraspatika/feature/absensi/data/dto/absensi_checkin.dart';
 import 'package:saraspatika/feature/absensi/data/dto/absensi_checkout.dart';
@@ -52,6 +53,7 @@ class AbsensiProvider extends ChangeNotifier {
 
   final AbsensiRepository _repository;
   final ApiService _api;
+  final DatabaseHelper _db = DatabaseHelper.instance;
 
   bool _loading = false;
   String? _errorMessage;
@@ -59,6 +61,7 @@ class AbsensiProvider extends ChangeNotifier {
   AbsensiStatus? _status;
   Map<String, dynamic>? _lastCheckInResponse;
   Map<String, dynamic>? _lastCheckOutResponse;
+  bool _hasLocalPendingCheckIn = false;
 
   AbsensiUiEvent? _uiEvent;
 
@@ -70,6 +73,8 @@ class AbsensiProvider extends ChangeNotifier {
   Map<String, dynamic>? get lastCheckOutResponse => _lastCheckOutResponse;
 
   AbsensiUiEvent? get uiEvent => _uiEvent;
+
+  bool get hasLocalPendingCheckIn => _hasLocalPendingCheckIn;
 
   void consumeUiEvent() {
     _uiEvent = null;
@@ -127,7 +132,32 @@ class AbsensiProvider extends ChangeNotifier {
           ? userId.trim()
           : await _resolveStoredUserId();
       final data = await _repository.fetchStatus(userId: resolvedId);
-      _status = data;
+      _hasLocalPendingCheckIn = false;
+
+      final pendingCheckIn = await _db.getPendingCheckInForUserOnDate(
+        resolvedId,
+        DateTime.now(),
+      );
+
+      if (data.item?.waktuMasuk == null && pendingCheckIn != null) {
+        final capturedAtRaw = pendingCheckIn['captured_at']?.toString();
+        final capturedAt = capturedAtRaw != null
+            ? DateTime.tryParse(capturedAtRaw)?.toLocal()
+            : null;
+        final mergedItem = AbsensiItem(
+          idAbsensi: data.item?.idAbsensi ?? '',
+          faceVerifiedMasuk: data.item?.faceVerifiedMasuk ?? false,
+          faceVerifiedPulang: data.item?.faceVerifiedPulang ?? false,
+          statusMasuk: data.item?.statusMasuk ?? 'PENDING',
+          statusPulang: data.item?.statusPulang,
+          waktuMasuk: capturedAt ?? DateTime.now().toLocal(),
+          waktuPulang: data.item?.waktuPulang,
+        );
+        _status = AbsensiStatus(ok: data.ok, item: mergedItem);
+        _hasLocalPendingCheckIn = true;
+      } else {
+        _status = data;
+      }
       notifyListeners();
       return data;
     } catch (e) {
@@ -279,10 +309,11 @@ class AbsensiProvider extends ChangeNotifier {
     required String? locationId,
     required double? lat,
     required double? lng,
+    bool allowEmptyAbsensiId = false,
   }) async {
     if (locationId == null ||
         locationId.trim().isEmpty ||
-        absensiId.trim().isEmpty ||
+        (!allowEmptyAbsensiId && absensiId.trim().isEmpty) ||
         lat == null ||
         lng == null) {
       _uiEvent = AbsensiUiEvent.error(

@@ -100,12 +100,42 @@ class DatabaseHelper {
       'offline_attendance',
       where: 'status = ?',
       whereArgs: [0],
+      orderBy: 'captured_at ASC',
     );
 
     // Tambahkan ini untuk melihat data di debug console
     debugPrint('Data Offline di SQLite: $result');
 
     return result;
+  }
+
+  Future<Map<String, dynamic>?> getPendingCheckInForUserOnDate(
+    String userId,
+    DateTime date,
+  ) async {
+    final db = await instance.database;
+    final rows = await db.query(
+      'offline_attendance',
+      where: 'status = ? AND user_id = ? AND type = ?',
+      whereArgs: [0, userId, 'checkin'],
+      orderBy: 'captured_at DESC',
+    );
+
+    for (final row in rows) {
+      final capturedAtRaw = row['captured_at']?.toString();
+      if (capturedAtRaw == null) continue;
+      final capturedAt = DateTime.tryParse(capturedAtRaw);
+      if (capturedAt == null) continue;
+      final localCapturedAt = capturedAt.toLocal();
+      final localDate = date.toLocal();
+      final sameDay =
+          localCapturedAt.year == localDate.year &&
+          localCapturedAt.month == localDate.month &&
+          localCapturedAt.day == localDate.day;
+      if (sameDay) return row;
+    }
+
+    return null;
   }
 
   Future<int> deleteAttendance(String id) async {

@@ -220,6 +220,7 @@ class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
     final absensiId = statusItem?.idAbsensi.trim();
     final sudahAbsenMasuk = statusItem?.waktuMasuk != null;
     final sudahAbsenPulang = statusItem?.waktuPulang != null;
+    final hasPendingCheckIn = absensiProvider.hasLocalPendingCheckIn;
 
     if (!sudahAbsenMasuk) {
       QuickAlert.show(
@@ -243,7 +244,7 @@ class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
       return;
     }
 
-    if (absensiId == null || absensiId.isEmpty) {
+    if ((absensiId == null || absensiId.isEmpty) && !hasPendingCheckIn) {
       QuickAlert.show(
         context: context,
         type: QuickAlertType.error,
@@ -291,10 +292,11 @@ class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
     await absensiProvider.submitCheckOutWithFace(
       offlineProvider: offlineProvider,
       imageFile: photo,
-      absensiId: absensiId,
+      absensiId: absensiId?.isNotEmpty == true ? absensiId! : '',
       locationId: selectedLocation.idLokasi,
       lat: coord.latitude,
       lng: coord.longitude,
+      allowEmptyAbsensiId: hasPendingCheckIn,
     );
   }
 
@@ -313,6 +315,7 @@ class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
     final statusItem = absensiProvider.status?.item;
     final bool sudahAbsenMasuk = statusItem?.waktuMasuk != null;
     final bool sudahAbsenPulang = statusItem?.waktuPulang != null;
+    final bool hasPendingCheckIn = absensiProvider.hasLocalPendingCheckIn;
 
     String displayStatus = 'Belum\nabsen';
     Color statusColor = const Color(0xFFE85A5A);
@@ -427,6 +430,7 @@ class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
               statusColor: statusColor,
               isLoadingJadwal: jadwalProvider.isLoading,
               jadwalShift: jadwalProvider.todayShift,
+              showOfflineBadge: hasPendingCheckIn,
             ),
           ),
           Positioned(
@@ -490,6 +494,7 @@ class _InfoCard extends StatelessWidget {
   final Color statusColor;
   final bool isLoadingJadwal;
   final JadwalShift? jadwalShift;
+  final bool showOfflineBadge;
 
   const _InfoCard({
     required this.tanggal,
@@ -498,6 +503,7 @@ class _InfoCard extends StatelessWidget {
     required this.statusColor,
     required this.isLoadingJadwal,
     required this.jadwalShift,
+    required this.showOfflineBadge,
   });
 
   @override
@@ -556,15 +562,41 @@ class _InfoCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      status,
-                      textAlign: TextAlign.right,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 12.5,
-                        color: statusColor,
-                        height: 1.05,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          status,
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12.5,
+                            color: statusColor,
+                            height: 1.05,
+                          ),
+                        ),
+                        if (showOfflineBadge) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE85A5A),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text(
+                              'OFFLINE',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),

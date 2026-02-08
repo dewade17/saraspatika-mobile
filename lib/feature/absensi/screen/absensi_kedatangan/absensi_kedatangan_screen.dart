@@ -248,6 +248,7 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
 
     final statusItem = absensiProvider.status?.item;
     final bool isAlreadyCheckedIn = statusItem?.waktuMasuk != null;
+    final bool hasPendingCheckIn = absensiProvider.hasLocalPendingCheckIn;
 
     String displayStatus = 'Belum\nabsen';
     Color statusColor = const Color(0xFFE85A5A);
@@ -355,6 +356,7 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
               statusColor: statusColor,
               isLoadingJadwal: jadwalProvider.isLoading,
               jadwalShift: jadwalProvider.todayShift,
+              showOfflineBadge: hasPendingCheckIn,
             ),
           ),
           Positioned(
@@ -418,6 +420,7 @@ class _InfoCard extends StatelessWidget {
   final Color statusColor;
   final bool isLoadingJadwal;
   final JadwalShift? jadwalShift;
+  final bool showOfflineBadge;
 
   const _InfoCard({
     required this.tanggal,
@@ -426,6 +429,7 @@ class _InfoCard extends StatelessWidget {
     required this.statusColor,
     required this.isLoadingJadwal,
     required this.jadwalShift,
+    required this.showOfflineBadge,
   });
 
   @override
@@ -484,15 +488,41 @@ class _InfoCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      status,
-                      textAlign: TextAlign.right,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 12.5,
-                        color: statusColor,
-                        height: 1.05,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          status,
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12.5,
+                            color: statusColor,
+                            height: 1.05,
+                          ),
+                        ),
+                        if (showOfflineBadge) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF57B87B),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text(
+                              'OFFLINE',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
