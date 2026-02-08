@@ -4,12 +4,13 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:saraspatika/core/database/database_helper.dart';
-import 'package:saraspatika/core/services/api_service.dart';
-import 'package:saraspatika/core/constants/endpoints.dart';
+import 'package:saraspatika/feature/absensi/data/dto/absensi_checkin.dart';
+import 'package:saraspatika/feature/absensi/data/dto/absensi_checkout.dart';
+import 'package:saraspatika/feature/absensi/data/repository/absensi_repository.dart';
 
 class OfflineProvider extends ChangeNotifier {
-  final ApiService _api = ApiService();
   final DatabaseHelper _db = DatabaseHelper.instance;
+  final AbsensiRepository _repository = AbsensiRepository();
 
   bool _isSyncing = false;
   bool get isSyncing => _isSyncing;
@@ -134,73 +135,105 @@ class OfflineProvider extends ChangeNotifier {
     _isSyncing = true;
     notifyListeners();
 
-    for (var data in pendingData) {
-      try {
-        var latestData = data;
-        if (data['type'] == 'checkout') {
-          try {
-            final db = await _db.database;
-            final rows = await db.query(
-              'offline_attendance',
-              where: 'id = ?',
-              whereArgs: [data['id']],
-              limit: 1,
-            );
-            if (rows.isNotEmpty) {
-              latestData = rows.first;
-            }
-          } catch (e) {
-            debugPrint("Gagal memuat ulang data checkout ID ${data['id']}: $e");
-          }
+    try {
+      final queue = List<Map<String, dynamic>>.from(pendingData)
+        ..sort(_compareSyncQueue);
+
+      for (final data in queue) {
+        final localId = data['id']?.toString();
+        if (localId == null || localId.isEmpty) {
+          debugPrint('Lewati data offline tanpa id lokal: $data');
+          continue;
         }
 
-        final response = await _sendToApi(
-          userId: latestData['user_id'],
-          type: latestData['type'],
-          lat: latestData['lat'],
-          lng: latestData['lng'],
-          imagePath: latestData['image_path'],
-          capturedAt: latestData['captured_at'],
-          locationId: latestData['location_id'],
-          absensiId: latestData['absensi_id'],
-        );
+        try {
+          // Selalu refresh dari SQLite sesaat sebelum kirim agar dapat ID terbaru.
+          final latestData = await _db.getPendingAttendanceById(localId);
+          if (latestData == null) continue;
 
-        if (latestData['type'] == 'checkin') {
-          try {
-            final responseMap = response is Map<String, dynamic>
-                ? response
-                : response is Map
-                ? Map<String, dynamic>.from(response)
-                : null;
-            final serverAbsensiId = responseMap?['absensi_id']?.toString();
-            if (serverAbsensiId != null &&
-                serverAbsensiId.isNotEmpty &&
-                latestData['id'] != null) {
-              await _db.updatePendingCheckoutId(
-                latestData['user_id'],
-                latestData['id'].toString(),
+          final response = await _sendToApi(
+            userId: latestData['user_id']?.toString() ?? '',
+            type: latestData['type']?.toString() ?? '',
+            lat: _toDouble(latestData['lat']),
+            lng: _toDouble(latestData['lng']),
+            imagePath: latestData['image_path']?.toString() ?? '',
+            capturedAt: latestData['captured_at']?.toString() ?? '',
+            locationId: latestData['location_id']?.toString(),
+            absensiId: latestData['absensi_id']?.toString(),
+            correlationId: localId,
+          );
+
+          if (latestData['type']?.toString() == 'checkin') {
+            final serverAbsensiId = _extractAbsensiId(response);
+            if (serverAbsensiId != null && serverAbsensiId.isNotEmpty) {
+              await DatabaseHelper.instance.updatePendingCheckoutId(
+                latestData['user_id']?.toString() ?? '',
+                localId,
                 serverAbsensiId,
               );
             }
-          } catch (e) {
-            debugPrint(
-              "Gagal update absensi_id checkout untuk ID ${latestData['id']}: $e",
-            );
           }
-        }
-        // Hapus dari SQLite jika sukses terkirim
-        await _db.deleteAttendance(latestData['id']);
-      } catch (e) {
-        debugPrint("Gagal sinkronisasi ID ${data['id']}: $e");
-      }
-    }
 
-    _isSyncing = false;
-    notifyListeners();
+          await _db.deleteAttendance(localId);
+        } catch (e) {
+          debugPrint("Gagal sinkronisasi ID $localId: $e");
+        }
+      }
+    } finally {
+      _isSyncing = false;
+      notifyListeners();
+    }
   }
 
-  // Helper untuk memanggil API Flask Anda
-  Future<dynamic> _sendToApi({
+  int _compareSyncQueue(Map<String, dynamic> a, Map<String, dynamic> b) {
+    final aUser = a['user_id']?.toString() ?? '';
+    final bUser = b['user_id']?.toString() ?? '';
+
+    if (aUser == bUser) {
+      final typeCompare = _syncTypePriority(
+        a['type']?.toString(),
+      ).compareTo(_syncTypePriority(b['type']?.toString()));
+      if (typeCompare != 0) return typeCompare;
+    }
+
+    final aCapturedAt = DateTime.tryParse(a['captured_at']?.toString() ?? '');
+    final bCapturedAt = DateTime.tryParse(b['captured_at']?.toString() ?? '');
+    if (aCapturedAt != null && bCapturedAt != null) {
+      final capturedCompare = aCapturedAt.compareTo(bCapturedAt);
+      if (capturedCompare != 0) return capturedCompare;
+    } else if (aCapturedAt != null) {
+      return -1;
+    } else if (bCapturedAt != null) {
+      return 1;
+    }
+
+    return (a['id']?.toString() ?? '').compareTo(b['id']?.toString() ?? '');
+  }
+
+  int _syncTypePriority(String? type) {
+    if (type == 'checkin') return 0;
+    if (type == 'checkout') return 1;
+    return 2;
+  }
+
+  double _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0.0;
+  }
+
+  String? _extractAbsensiId(Map<String, dynamic> response) {
+    final direct = response['absensi_id']?.toString();
+    if (direct != null && direct.isNotEmpty) return direct;
+
+    final data = response['data'];
+    if (data is Map) {
+      final nested = data['absensi_id']?.toString();
+      if (nested != null && nested.isNotEmpty) return nested;
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>> _sendToApi({
     required String userId,
     required String type,
     required double lat,
@@ -209,39 +242,56 @@ class OfflineProvider extends ChangeNotifier {
     required String capturedAt,
     String? locationId,
     String? absensiId,
+    String? correlationId,
   }) async {
-    final endpoint = type == 'checkin'
-        ? "${Endpoints.faceBaseURL}/absensi/checkin"
-        : "${Endpoints.faceBaseURL}/absensi/checkout";
-
-    final fields = <String, String>{
-      'user_id': userId,
-      'lat': lat.toString(),
-      'lng': lng.toString(),
-      'captured_at': capturedAt,
-    };
-
-    if (locationId != null) fields['location_id'] = locationId;
-    if (absensiId != null) fields['absensi_id'] = absensiId;
-
     final imageFile = File(imagePath);
     if (!await imageFile.exists()) {
       throw Exception('File foto tidak ditemukan: $imagePath');
     }
 
-    final length = await imageFile.length();
+    if (type == 'checkin') {
+      final safeLocationId = locationId?.trim() ?? '';
+      if (safeLocationId.isEmpty) {
+        throw StateError('location_id checkin kosong.');
+      }
 
-    return await _api.multipart(
-      endpoint,
-      fields: fields,
-      files: [
-        ApiUploadFile.fromStream(
-          fieldName: 'image',
-          stream: imageFile.openRead(),
-          length: length,
-          filename: 'face_verify.jpg',
+      return _repository.checkIn(
+        request: CheckInRequest(
+          userId: userId,
+          locationId: safeLocationId,
+          lat: lat,
+          lng: lng,
+          capturedAt: capturedAt,
+          correlationId: correlationId,
         ),
-      ],
-    );
+        imageFile: imageFile,
+      );
+    }
+
+    if (type == 'checkout') {
+      final safeLocationId = locationId?.trim() ?? '';
+      final safeAbsensiId = absensiId?.trim() ?? '';
+      if (safeLocationId.isEmpty) {
+        throw StateError('location_id checkout kosong.');
+      }
+      if (safeAbsensiId.isEmpty) {
+        throw StateError('absensi_id checkout kosong.');
+      }
+
+      return _repository.checkOut(
+        request: CheckOutRequest(
+          userId: userId,
+          absensiId: safeAbsensiId,
+          locationId: safeLocationId,
+          lat: lat,
+          lng: lng,
+          capturedAt: capturedAt,
+          correlationId: correlationId,
+        ),
+        imageFile: imageFile,
+      );
+    }
+
+    throw StateError('Tipe absensi tidak valid: $type');
   }
 }

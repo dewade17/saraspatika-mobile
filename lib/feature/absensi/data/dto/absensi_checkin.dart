@@ -6,6 +6,7 @@ class CheckInRequest {
   final double lat;
   final double lng;
   final String? capturedAt; // Waktu saat tombol ditekan (ISO8601)
+  final String? correlationId;
 
   CheckInRequest({
     required this.userId,
@@ -13,6 +14,7 @@ class CheckInRequest {
     required this.lat,
     required this.lng,
     this.capturedAt,
+    this.correlationId,
   });
 
   // Mengubah object ke Map untuk dikirim sebagai fields di MultipartRequest
@@ -23,6 +25,8 @@ class CheckInRequest {
       'lat': lat.toString(),
       'lng': lng.toString(),
       if (capturedAt != null) 'captured_at': capturedAt!,
+      if (correlationId != null && correlationId!.trim().isNotEmpty)
+        'correlation_id': correlationId!,
     };
   }
 
@@ -34,6 +38,7 @@ class CheckInRequest {
       'lat': lat,
       'lng': lng,
       'captured_at': capturedAt,
+      'correlation_id': correlationId,
     };
   }
 
@@ -44,6 +49,7 @@ class CheckInRequest {
       lat: (map['lat'] as num).toDouble(),
       lng: (map['lng'] as num).toDouble(),
       capturedAt: map['captured_at'],
+      correlationId: map['correlation_id']?.toString(),
     );
   }
 

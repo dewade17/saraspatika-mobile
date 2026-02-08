@@ -7,6 +7,7 @@ class CheckOutRequest {
   final double lat;
   final double lng;
   final String? capturedAt; // ISO8601 timestamp untuk mode offline
+  final String? correlationId;
 
   CheckOutRequest({
     required this.userId,
@@ -15,6 +16,7 @@ class CheckOutRequest {
     required this.lat,
     required this.lng,
     this.capturedAt,
+    this.correlationId,
   });
 
   // Digunakan untuk mengirim data lewat MultipartRequest
@@ -26,6 +28,8 @@ class CheckOutRequest {
       'lat': lat.toString(),
       'lng': lng.toString(),
       if (capturedAt != null) 'captured_at': capturedAt!,
+      if (correlationId != null && correlationId!.trim().isNotEmpty)
+        'correlation_id': correlationId!,
     };
   }
 
@@ -37,6 +41,7 @@ class CheckOutRequest {
       'lat': lat,
       'lng': lng,
       'captured_at': capturedAt,
+      'correlation_id': correlationId,
     };
   }
 
@@ -48,6 +53,7 @@ class CheckOutRequest {
       lat: (map['lat'] as num).toDouble(),
       lng: (map['lng'] as num).toDouble(),
       capturedAt: map['captured_at'],
+      correlationId: map['correlation_id']?.toString(),
     );
   }
 

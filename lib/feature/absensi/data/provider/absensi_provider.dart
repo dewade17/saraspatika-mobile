@@ -246,6 +246,7 @@ class AbsensiProvider extends ChangeNotifier {
               lat: request.lat,
               lng: request.lng,
               capturedAt: request.capturedAt,
+              correlationId: request.correlationId,
             );
 
       final res = await _repository.checkIn(request: req, imageFile: imageFile);
@@ -286,6 +287,7 @@ class AbsensiProvider extends ChangeNotifier {
               lat: request.lat,
               lng: request.lng,
               capturedAt: request.capturedAt,
+              correlationId: request.correlationId,
             );
 
       final res = await _repository.checkOut(

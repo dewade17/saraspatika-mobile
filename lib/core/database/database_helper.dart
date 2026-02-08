@@ -109,6 +109,18 @@ class DatabaseHelper {
     return result;
   }
 
+  Future<Map<String, dynamic>?> getPendingAttendanceById(String id) async {
+    final db = await instance.database;
+    final rows = await db.query(
+      'offline_attendance',
+      where: 'id = ? AND status = ?',
+      whereArgs: [id, 0],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first;
+  }
+
   Future<Map<String, dynamic>?> getPendingCheckInForUserOnDate(
     String userId,
     DateTime date,
