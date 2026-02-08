@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:saraspatika/core/constants/colors.dart';
+import 'package:saraspatika/feature/registrasi_wajah/screen/registrasi_wajah.dart';
 import 'package:saraspatika/feature/request_wajah/screen/form_request_wajah/request_reset_wajah_screen.dart';
 
 class FaceReenrollmentItem {
@@ -160,16 +161,14 @@ class _HomeRequestWajahState extends State<HomeRequestWajah> {
                               const SizedBox(height: 20),
                               ElevatedButton(
                                 onPressed: () {
-                                  setState(() => _faceRegistered = true);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Simulasi: Face ID terdaftar (UI saja)',
-                                      ),
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const RegistrasiWajah(),
                                     ),
                                   );
                                 },
-                                child: const Text('Daftar Face ID'),
+                                child: const Text('Registrasi Wajah'),
                               ),
                             ],
                           ),
