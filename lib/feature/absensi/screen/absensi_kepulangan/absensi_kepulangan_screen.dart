@@ -7,7 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:quickalert/quickalert.dart';
 import 'package:saraspatika/core/shared_widgets/app_button_widget.dart';
-import 'package:saraspatika/feature/absensi/data/dto/absensi_checkout.dart';
+import 'package:saraspatika/feature/absensi/data/provider/offline_provider.dart';
 import 'package:saraspatika/feature/absensi/data/dto/jadwal_shift.dart';
 import 'package:saraspatika/feature/absensi/data/provider/absensi_provider.dart';
 import 'package:saraspatika/feature/absensi/data/provider/jadwal_shift_provider.dart';
@@ -257,7 +257,9 @@ class _AbsensiKepulanganScreenState extends State<AbsensiKepulanganScreen> {
 
     if (!mounted || photo == null) return;
 
+    final offlineProvider = context.read<OfflineProvider>();
     await absensiProvider.submitCheckOutWithFace(
+      offlineProvider: offlineProvider,
       imageFile: photo,
       absensiId: absensiId,
       locationId: selectedLocation.idLokasi,

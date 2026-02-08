@@ -8,6 +8,9 @@ import 'package:saraspatika/feature/home/screen/widget/header_user_appbar.dart';
 import 'package:saraspatika/feature/izin_sakit_cuti/screen/izin_sakit_cuti.dart';
 import 'package:saraspatika/feature/profile/data/provider/user_profile_provider.dart';
 import 'package:saraspatika/feature/profile/screen/profile_screen.dart';
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:saraspatika/feature/absensi/data/provider/offline_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -58,17 +61,35 @@ class HomeScreenContent extends StatefulWidget {
 }
 
 class _HomeScreenContentState extends State<HomeScreenContent> {
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+
   @override
   void initState() {
     super.initState();
     // Panggil fetchCurrentUser agar data profil terbaru selalu diambil saat home dibuka
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<UserProfileProvider>().fetchCurrentUser();
+      final offlineProvider = context.read<OfflineProvider>();
+      offlineProvider.syncPendingData();
+      _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+        results,
+      ) {
+        final hasInternet = !results.contains(ConnectivityResult.none);
+        if (hasInternet) {
+          offlineProvider.syncPendingData();
+        }
+      });
     });
   }
 
   Future<void> _profileRefresh() async {
     await context.read<UserProfileProvider>().fetchCurrentUser();
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    super.dispose();
   }
 
   @override

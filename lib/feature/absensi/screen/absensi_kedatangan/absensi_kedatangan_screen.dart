@@ -12,6 +12,7 @@ import 'package:saraspatika/feature/absensi/data/provider/absensi_provider.dart'
 import 'package:saraspatika/feature/absensi/data/provider/jadwal_shift_provider.dart';
 import 'package:saraspatika/feature/absensi/data/provider/lokasi_provider.dart';
 import 'package:saraspatika/feature/absensi/screen/face_detection/face_detection_screen.dart';
+import 'package:saraspatika/feature/absensi/data/provider/offline_provider.dart';
 
 class AbsensiKedatanganScreen extends StatefulWidget {
   const AbsensiKedatanganScreen({super.key});
@@ -192,8 +193,10 @@ class _AbsensiKedatanganScreenState extends State<AbsensiKedatanganScreen> {
 
     final lokasiProvider = context.read<LokasiProvider>();
     final coord = lokasiProvider.currentCoordinate;
+    final offlineProvider = context.read<OfflineProvider>();
 
     await context.read<AbsensiProvider>().submitCheckInWithFace(
+      offlineProvider: offlineProvider,
       imageFile: photo,
       locationId: lokasiProvider.selectedLocation?.idLokasi,
       lat: coord?.latitude,

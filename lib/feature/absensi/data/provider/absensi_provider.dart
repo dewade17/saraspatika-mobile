@@ -6,6 +6,7 @@ import 'package:saraspatika/core/services/api_service.dart';
 import 'package:saraspatika/feature/absensi/data/dto/absensi_checkin.dart';
 import 'package:saraspatika/feature/absensi/data/dto/absensi_checkout.dart';
 import 'package:saraspatika/feature/absensi/data/dto/absensi_status.dart';
+import 'package:saraspatika/feature/absensi/data/provider/offline_provider.dart';
 import 'package:saraspatika/feature/absensi/data/repository/absensi_repository.dart';
 
 enum AbsensiUiEventType { loading, success, error }
@@ -220,6 +221,7 @@ class AbsensiProvider extends ChangeNotifier {
   }
 
   Future<void> submitCheckInWithFace({
+    required OfflineProvider offlineProvider,
     required File imageFile,
     required String? locationId,
     required double? lat,
@@ -240,16 +242,20 @@ class AbsensiProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await checkIn(
-        request: CheckInRequest(
-          userId: '',
-          locationId: locationId.trim(),
-          lat: lat,
-          lng: lng,
-          capturedAt: DateTime.now().toIso8601String(),
-        ),
-        imageFile: imageFile,
+      final resolvedId = await _resolveStoredUserId();
+
+      await offlineProvider.processAttendance(
+        userId: resolvedId,
+        type: 'checkin',
+        lat: lat,
+        lng: lng,
+        imagePath: imageFile.path,
+        locationId: locationId.trim(),
       );
+
+      try {
+        await fetchStatus(userId: resolvedId);
+      } catch (_) {}
 
       final waktuMasuk =
           _status?.item?.waktuMasuk?.toLocal() ?? DateTime.now().toLocal();
@@ -267,6 +273,7 @@ class AbsensiProvider extends ChangeNotifier {
   }
 
   Future<void> submitCheckOutWithFace({
+    required OfflineProvider offlineProvider,
     required File imageFile,
     required String absensiId,
     required String? locationId,
@@ -289,17 +296,21 @@ class AbsensiProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await checkOut(
-        request: CheckOutRequest(
-          userId: '',
-          absensiId: absensiId.trim(),
-          locationId: locationId.trim(),
-          lat: lat,
-          lng: lng,
-          capturedAt: DateTime.now().toIso8601String(),
-        ),
-        imageFile: imageFile,
+      final resolvedId = await _resolveStoredUserId();
+
+      await offlineProvider.processAttendance(
+        userId: resolvedId,
+        type: 'checkout',
+        lat: lat,
+        lng: lng,
+        imagePath: imageFile.path,
+        locationId: locationId.trim(),
+        absensiId: absensiId.trim(),
       );
+
+      try {
+        await fetchStatus(userId: resolvedId);
+      } catch (_) {}
 
       final waktuPulang =
           _status?.item?.waktuPulang?.toLocal() ?? DateTime.now().toLocal();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
+import 'package:saraspatika/feature/absensi/data/provider/offline_provider.dart';
 import 'package:saraspatika/feature/absensi/screen/absensi_kepulangan/absensi_kepulangan_screen.dart';
 import 'package:saraspatika/feature/registrasi_wajah/data/provider/enroll_face_provider.dart';
 import 'package:saraspatika/feature/absensi/data/provider/get_face_provider.dart';
@@ -54,6 +55,9 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<RequestWajahProvider>(
           create: (_) => RequestWajahProvider(),
+        ),
+        ChangeNotifierProvider<OfflineProvider>(
+          create: (_) => OfflineProvider(),
         ),
       ],
       child: MaterialApp(

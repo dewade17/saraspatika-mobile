@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:saraspatika/core/database/database_helper.dart';
 import 'package:saraspatika/core/services/api_service.dart';
 import 'package:saraspatika/core/constants/endpoints.dart';
@@ -23,8 +25,10 @@ class OfflineProvider extends ChangeNotifier {
     String? absensiId,
   }) async {
     final capturedAt = DateTime.now().toIso8601String();
+    final persistedImagePath = await _moveImageToDocuments(imagePath);
 
     // Cek koneksi internet
+
     final connectivityResult = await Connectivity().checkConnectivity();
     final hasInternet = !connectivityResult.contains(ConnectivityResult.none);
 
@@ -36,7 +40,7 @@ class OfflineProvider extends ChangeNotifier {
           type: type,
           lat: lat,
           lng: lng,
-          imagePath: imagePath,
+          imagePath: persistedImagePath,
           capturedAt: capturedAt,
           locationId: locationId,
           absensiId: absensiId,
@@ -49,7 +53,7 @@ class OfflineProvider extends ChangeNotifier {
           type,
           lat,
           lng,
-          imagePath,
+          persistedImagePath,
           capturedAt,
           locationId,
           absensiId,
@@ -62,11 +66,36 @@ class OfflineProvider extends ChangeNotifier {
         type,
         lat,
         lng,
-        imagePath,
+        persistedImagePath,
         capturedAt,
         locationId,
         absensiId,
       );
+    }
+  }
+
+  Future<String> _moveImageToDocuments(String imagePath) async {
+    final imageFile = File(imagePath);
+    if (!await imageFile.exists()) {
+      return imagePath;
+    }
+
+    final documentsDir = await getApplicationDocumentsDirectory();
+    final targetDir = Directory(p.join(documentsDir.path, 'attendance_images'));
+    await targetDir.create(recursive: true);
+
+    final targetPath = p.join(targetDir.path, p.basename(imagePath));
+    if (p.normalize(targetPath) == p.normalize(imagePath)) {
+      return imagePath;
+    }
+
+    try {
+      final moved = await imageFile.rename(targetPath);
+      return moved.path;
+    } catch (_) {
+      final copied = await imageFile.copy(targetPath);
+      await imageFile.delete();
+      return copied.path;
     }
   }
 
