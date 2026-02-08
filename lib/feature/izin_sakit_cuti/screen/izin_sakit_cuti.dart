@@ -298,6 +298,7 @@ class _IzinSakitCutiState extends State<IzinSakitCuti> {
               ),
             ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab_izin_sakit_cuti',
         onPressed: _onAdd,
         backgroundColor: AppColors.primaryColor,
         child: const Icon(Icons.add, color: Colors.white),

@@ -1,21 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:saraspatika/core/constants/colors.dart';
+import 'package:saraspatika/core/services/api_service.dart';
+import 'package:saraspatika/feature/absensi/data/provider/get_face_provider.dart';
+import 'package:saraspatika/feature/login/data/provider/auth_provider.dart';
 import 'package:saraspatika/feature/registrasi_wajah/screen/registrasi_wajah.dart';
+import 'package:saraspatika/feature/request_wajah/data/dto/request_wajah.dart';
+import 'package:saraspatika/feature/request_wajah/data/provider/request_wajah_provider.dart';
 import 'package:saraspatika/feature/request_wajah/screen/form_request_wajah/request_reset_wajah_screen.dart';
-
-class FaceReenrollmentItem {
-  final String alasan;
-  final String status;
-  final String? catatan;
-  final DateTime createdAt;
-
-  FaceReenrollmentItem({
-    required this.alasan,
-    required this.status,
-    this.catatan,
-    DateTime? createdAt,
-  }) : createdAt = createdAt ?? DateTime.now();
-}
 
 class HomeRequestWajah extends StatefulWidget {
   const HomeRequestWajah({super.key});
@@ -25,59 +18,156 @@ class HomeRequestWajah extends StatefulWidget {
 }
 
 class _HomeRequestWajahState extends State<HomeRequestWajah> {
-  bool _faceRegistered = false;
-  bool _loading = true;
-  List<FaceReenrollmentItem> _recentRequests = [];
+  bool? _faceRegistered; // null = belum diketahui (loading)
+  bool _initialLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadUiOnlyData();
+    _loadInitial();
   }
 
-  Future<void> _loadUiOnlyData() async {
-    setState(() => _loading = true);
+  Future<String?> _resolveUserId() async {
+    final auth = context.read<AuthProvider>();
+    final fromAuth = (auth.me?.idUser ?? '').trim();
+    if (fromAuth.isNotEmpty) return fromAuth;
 
-    await Future.delayed(const Duration(milliseconds: 450));
+    try {
+      return (await ApiService().getUserId())?.trim();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<bool> _fetchFaceRegistered(String userId) async {
+    final getFaceProvider = context.read<GetFaceProvider>();
+    try {
+      final face = await getFaceProvider.fetchFaceData(userId, maxRetries: 3);
+      return face != null && face.items.isNotEmpty;
+    } catch (e) {
+      // Konsisten dengan AuthWrapper: 404 = belum ada data wajah
+      if (e is ApiException && e.statusCode == 404) return false;
+
+      final msg = getFaceProvider.errorMessage ?? 'Gagal mengambil data wajah.';
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
+      }
+      // Fail-safe: anggap belum terdaftar kalau error non-404 (biar tidak salah kasih akses)
+      return false;
+    }
+  }
+
+  Future<void> _loadInitial() async {
+    setState(() {
+      _initialLoading = true;
+      _faceRegistered = null;
+    });
+
+    final userId = await _resolveUserId();
     if (!mounted) return;
 
-    setState(() {
-      _loading = false;
+    if (userId == null || userId.isEmpty) {
+      setState(() {
+        _faceRegistered = false;
+        _initialLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User ID tidak ditemukan. Silakan login ulang.'),
+        ),
+      );
+      return;
+    }
 
-      // Default UI-only sample (boleh dihapus kalau mau kosong)
-      _faceRegistered = true;
-      _recentRequests = [
-        FaceReenrollmentItem(
-          alasan: 'Kamera depan buram, wajah tidak terbaca',
-          status: 'MENUNGGU',
-        ),
-        FaceReenrollmentItem(
-          alasan: 'Perubahan bentuk wajah (pakai kacamata)',
-          status: 'DITOLAK',
-          catatan: 'Mohon gunakan pencahayaan yang cukup saat verifikasi.',
-        ),
-        FaceReenrollmentItem(
-          alasan: 'Data wajah lama tidak sesuai',
-          status: 'SETUJU',
-          catatan: 'Silakan lakukan perekaman ulang.',
-        ),
-      ];
-    });
+    final hasFace = await _fetchFaceRegistered(userId);
+    if (!mounted) return;
+
+    setState(() => _faceRegistered = hasFace);
+
+    if (hasFace) {
+      await _loadRequests(showError: true);
+    }
+
+    if (!mounted) return;
+    setState(() => _initialLoading = false);
+  }
+
+  Future<void> _loadRequests({required bool showError}) async {
+    final provider = context.read<RequestWajahProvider>();
+    try {
+      await provider.fetchMyRequests();
+    } catch (_) {
+      if (!showError || !mounted) return;
+      final message = provider.errorMessage ?? 'Gagal memuat data.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 
   Future<void> _onRefresh() async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    final userId = await _resolveUserId();
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Refresh UI saja')));
+
+    if (userId == null || userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User ID tidak ditemukan. Silakan login ulang.'),
+        ),
+      );
+      return;
+    }
+
+    final hasFace = await _fetchFaceRegistered(userId);
+    if (!mounted) return;
+
+    setState(() => _faceRegistered = hasFace);
+
+    if (hasFace) {
+      await _loadRequests(showError: true);
+    }
   }
 
+  Future<void> _openRequestReset() async {
+    final res = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RequestResetWajahScreen(
+          onSubmit: (alasan) async {
+            try {
+              await context.read<RequestWajahProvider>().createRequest(
+                alasan: alasan,
+              );
+              return null;
+            } catch (_) {
+              final message =
+                  context.read<RequestWajahProvider>().errorMessage ??
+                  'Pengajuan gagal dikirim.';
+              return message;
+            }
+          },
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    if (res == true) {
+      await _onRefresh();
+    }
+  }
+
+  String _normStatus(String status) => status.trim().toLowerCase();
+
   Color _statusBg(String status) {
-    switch (status.toLowerCase()) {
-      case 'SETUJU':
+    switch (_normStatus(status)) {
+      case 'setuju':
+      case 'disetujui':
+      case 'approved':
         return Colors.green.shade100;
-      case 'DITOLAK':
+      case 'ditolak':
+      case 'rejected':
         return Colors.red.shade100;
       default:
         return Colors.orange.shade100;
@@ -85,10 +175,13 @@ class _HomeRequestWajahState extends State<HomeRequestWajah> {
   }
 
   Color _statusFg(String status) {
-    switch (status.toLowerCase()) {
-      case 'SETUJU':
+    switch (_normStatus(status)) {
+      case 'setuju':
+      case 'disetujui':
+      case 'approved':
         return Colors.green;
-      case 'DITOLAK':
+      case 'ditolak':
+      case 'rejected':
         return Colors.red;
       default:
         return Colors.orange;
@@ -96,14 +189,32 @@ class _HomeRequestWajahState extends State<HomeRequestWajah> {
   }
 
   String _statusLabel(String status) {
-    final s = status.toLowerCase();
-    if (s == 'SETUJU') return 'SETUJU';
-    if (s == 'DITOLAK') return 'DITOLAK';
+    final s = _normStatus(status);
+    if (s == 'setuju' || s == 'disetujui' || s == 'approved') return 'SETUJU';
+    if (s == 'ditolak' || s == 'rejected') return 'DITOLAK';
     return 'MENUNGGU';
+  }
+
+  String _formatDate(DateTime date) {
+    try {
+      return DateFormat('dd MMM yyyy, HH:mm', 'id_ID').format(date.toLocal());
+    } catch (_) {
+      return DateFormat('dd MMM yyyy, HH:mm').format(date.toLocal());
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<RequestWajahProvider>();
+
+    final isLoading =
+        provider.isLoading || _initialLoading || _faceRegistered == null;
+    final hasFace = _faceRegistered == true;
+
+    final List<FaceResetRequest> requests = List<FaceResetRequest>.from(
+      provider.requests,
+    )..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
@@ -131,7 +242,7 @@ class _HomeRequestWajahState extends State<HomeRequestWajah> {
       ),
       body: RefreshIndicator(
         onRefresh: _onRefresh,
-        child: _loading
+        child: isLoading
             ? const Center(child: CircularProgressIndicator())
             : SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -140,12 +251,12 @@ class _HomeRequestWajahState extends State<HomeRequestWajah> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const SizedBox(height: 10),
-                      if (_faceRegistered != true) ...[
+                      if (!hasFace) ...[
                         Center(
                           child: Column(
                             children: [
                               Image.asset(
-                                'assets/images/Face.png',
+                                'lib/assets/images/Face.png',
                                 width: 200,
                                 height: 200,
                               ),
@@ -160,13 +271,15 @@ class _HomeRequestWajahState extends State<HomeRequestWajah> {
                               ),
                               const SizedBox(height: 20),
                               ElevatedButton(
-                                onPressed: () {
-                                  Navigator.push(
+                                onPressed: () async {
+                                  await Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => const RegistrasiWajah(),
                                     ),
                                   );
+                                  if (!mounted) return;
+                                  await _onRefresh();
                                 },
                                 child: const Text('Registrasi Wajah'),
                               ),
@@ -228,8 +341,7 @@ class _HomeRequestWajahState extends State<HomeRequestWajah> {
                           ),
                         ),
                         const SizedBox(height: 10),
-
-                        if (_recentRequests.isNotEmpty) ...[
+                        if (requests.isNotEmpty) ...[
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(16),
@@ -268,9 +380,9 @@ class _HomeRequestWajahState extends State<HomeRequestWajah> {
                                 ListView.builder(
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: _recentRequests.length,
+                                  itemCount: requests.length,
                                   itemBuilder: (context, index) {
-                                    final request = _recentRequests[index];
+                                    final item = requests[index];
 
                                     return Container(
                                       margin: const EdgeInsets.symmetric(
@@ -294,7 +406,7 @@ class _HomeRequestWajahState extends State<HomeRequestWajah> {
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
-                                          Text(request.alasan),
+                                          Text(item.alasan),
                                           const SizedBox(height: 8),
                                           const Text(
                                             '📌 Status:',
@@ -311,33 +423,47 @@ class _HomeRequestWajahState extends State<HomeRequestWajah> {
                                               vertical: 6,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: _statusBg(request.status),
+                                              color: _statusBg(item.status),
                                               borderRadius:
                                                   BorderRadius.circular(20),
                                             ),
                                             child: Text(
-                                              _statusLabel(request.status),
+                                              _statusLabel(item.status),
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
-                                                color: _statusFg(
-                                                  request.status,
-                                                ),
+                                                color: _statusFg(item.status),
                                               ),
                                             ),
                                           ),
-                                          if (request.catatan != null &&
-                                              request.catatan!
-                                                  .trim()
-                                                  .isNotEmpty) ...[
-                                            const SizedBox(height: 8),
-                                            const Text(
-                                              '📄 Catatan:',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            '🕒 Diajukan: ${_formatDate(item.createdAt)}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                          if (item.adminNote != null &&
+                                              item.adminNote!.trim().isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                top: 8,
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  const Text(
+                                                    '📄 Catatan:',
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  Text(item.adminNote!),
+                                                ],
                                               ),
                                             ),
-                                            Text(request.catatan!),
-                                          ],
                                         ],
                                       ),
                                     );
@@ -374,21 +500,16 @@ class _HomeRequestWajahState extends State<HomeRequestWajah> {
                         ],
                         const SizedBox(height: 40),
                       ],
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
               ),
       ),
-      floatingActionButton: (_faceRegistered == true)
+      floatingActionButton: (!isLoading && hasFace)
           ? FloatingActionButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const RequestResetWajahScreen(),
-                  ),
-                );
-              },
+              heroTag: null,
+              onPressed: _openRequestReset,
               child: const Icon(Icons.add_circle),
             )
           : null,

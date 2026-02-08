@@ -31,5 +31,5 @@ class Endpoints {
   static const String absensiCheckout = "$faceBaseURL/absensi/checkout";
 
   //face-reset-requests
-  static const String faceResetRequests = "$baseURL/face-reset-requests";
+  static const String faceResetRequests = "$baseURL/face-reset-request";
 }

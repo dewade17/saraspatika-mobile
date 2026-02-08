@@ -4,7 +4,7 @@ import 'package:saraspatika/core/constants/colors.dart';
 class RequestResetWajahScreen extends StatefulWidget {
   const RequestResetWajahScreen({super.key, this.onSubmit});
 
-  final Future<bool> Function(String alasan)? onSubmit;
+  final Future<String?> Function(String alasan)? onSubmit;
 
   @override
   State<RequestResetWajahScreen> createState() =>
@@ -28,12 +28,12 @@ class _RequestResetWajahScreenState extends State<RequestResetWajahScreen> {
 
     setState(() => _isLoading = true);
 
-    bool success = true;
+    String? errorMessage;
     if (widget.onSubmit != null) {
       try {
-        success = await widget.onSubmit!(_alasanController.text.trim());
+        errorMessage = await widget.onSubmit!(_alasanController.text.trim());
       } catch (_) {
-        success = false;
+        errorMessage = 'Pengajuan gagal dikirim.';
       }
     }
 
@@ -49,15 +49,15 @@ class _RequestResetWajahScreenState extends State<RequestResetWajahScreen> {
       return;
     }
 
-    if (success) {
+    if (errorMessage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Pengajuan berhasil dikirim')),
       );
-      Navigator.pop(context);
+      Navigator.pop(context, true);
     } else {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Pengajuan gagal dikirim')));
+      ).showSnackBar(SnackBar(content: Text(errorMessage)));
     }
   }
 

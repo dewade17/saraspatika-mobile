@@ -123,12 +123,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 24),
               const SectionSettingScreen(),
               const SizedBox(height: 100),
-              
             ],
           ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab_profile',
         onPressed: () {
           Navigator.push(
             context,

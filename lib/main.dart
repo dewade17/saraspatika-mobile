@@ -11,6 +11,7 @@ import 'package:saraspatika/feature/login/data/provider/auth_provider.dart';
 import 'package:saraspatika/feature/login/screen/login_screen.dart';
 import 'package:saraspatika/feature/profile/data/provider/user_profile_provider.dart';
 import 'package:saraspatika/feature/registrasi_wajah/screen/registrasi_wajah.dart';
+import 'package:saraspatika/feature/request_wajah/data/provider/request_wajah_provider.dart';
 import 'package:saraspatika/feature/reset_password/data/provider/reset_password_provider.dart';
 import 'package:saraspatika/feature/reset_password/screen/reset_password.dart';
 import 'package:saraspatika/feature/splash_screen/splash_screen.dart';
@@ -50,6 +51,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<LokasiProvider>(create: (_) => LokasiProvider()),
         ChangeNotifierProvider<JadwalShiftProvider>(
           create: (_) => JadwalShiftProvider(),
+        ),
+        ChangeNotifierProvider<RequestWajahProvider>(
+          create: (_) => RequestWajahProvider(),
         ),
       ],
       child: MaterialApp(
