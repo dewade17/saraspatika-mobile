@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:saraspatika/core/services/api_service.dart';
 import 'package:saraspatika/core/database/database_helper.dart';
 import 'package:saraspatika/feature/absensi/data/dto/absensi_checkin.dart';
 import 'package:saraspatika/feature/absensi/data/dto/absensi_checkout.dart';
@@ -52,17 +54,23 @@ class OfflineProvider extends ChangeNotifier {
         );
         debugPrint("Berhasil kirim langsung (Online)");
       } catch (e) {
-        // Jika gagal kirim karena gangguan jaringan mendadak, simpan ke SQLite
-        await _saveLocally(
-          userId,
-          type,
-          lat,
-          lng,
-          persistedImagePath,
-          capturedAt,
-          locationId,
-          absensiId,
-        );
+        if (_isNetworkRelatedError(e)) {
+          // Jika gagal kirim karena gangguan jaringan mendadak, simpan ke SQLite
+          await _saveLocally(
+            userId,
+            type,
+            lat,
+            lng,
+            persistedImagePath,
+            capturedAt,
+            locationId,
+            absensiId,
+          );
+          return;
+        }
+
+        // Error dari server (mis. 4xx/5xx) atau validasi lokal harus diteruskan ke UI.
+        rethrow;
       }
     } else {
       // Jika benar-benar offline, langsung simpan ke SQLite
@@ -231,6 +239,17 @@ class OfflineProvider extends ChangeNotifier {
   double _toDouble(dynamic value) {
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '') ?? 0.0;
+  }
+
+  bool _isNetworkRelatedError(Object error) {
+    if (error is ApiException) {
+      // ApiException dengan statusCode berarti server merespons (4xx/5xx), jangan simpan offline.
+      return error.statusCode == null;
+    }
+
+    return error is SocketException ||
+        error is TimeoutException ||
+        error is HttpException;
   }
 
   String? _buildDirectCorrelationId({required String type, String? absensiId}) {

@@ -100,13 +100,16 @@ class AbsensiProvider extends ChangeNotifier {
     }
 
     if (e is ApiException) {
-      final d = e.details;
-      if (d is Map) {
-        final msg = d['message'] ?? d['detail'] ?? d['error'] ?? d['msg'];
-        if (msg != null && msg.toString().trim().isNotEmpty) {
-          return msg.toString();
-        }
+      final apiMessage = _extractApiErrorMessage(e.details);
+      if (apiMessage != null && apiMessage.isNotEmpty) {
+        return _normalizeFaceErrorMessage(apiMessage);
       }
+
+      final knownFaceError = _detectKnownFaceError(e.toString());
+      if (knownFaceError != null) {
+        return knownFaceError;
+      }
+
       if (e.statusCode == 400) return 'Input tidak valid.';
       if (e.statusCode == 401) return 'Unauthorized.';
       if (e.statusCode == 403) return 'Tidak diizinkan.';
@@ -115,6 +118,66 @@ class AbsensiProvider extends ChangeNotifier {
     }
 
     return 'Terjadi kesalahan: $e';
+  }
+
+  String _normalizeFaceErrorMessage(String rawMessage) {
+    final message = rawMessage.trim();
+    if (message.isEmpty) return message;
+
+    return _detectKnownFaceError(message) ?? message;
+  }
+
+  String? _detectKnownFaceError(String message) {
+    final lower = message.toLowerCase();
+    if (lower.contains('tidak ada wajah terdeteksi') ||
+        lower.contains('no face detected')) {
+      return 'Wajah tidak terdeteksi pada foto. Pastikan wajah terlihat jelas, tidak blur, dan berada di tengah frame.';
+    }
+    return null;
+  }
+
+  String? _extractApiErrorMessage(dynamic node) {
+    if (node == null) return null;
+
+    if (node is String) {
+      final text = node.trim();
+      return text.isEmpty ? null : text;
+    }
+
+    if (node is Map) {
+      final map = Map<String, dynamic>.from(
+        node.map((key, value) => MapEntry(key.toString(), value)),
+      );
+
+      for (final key in const <String>['message', 'detail', 'error', 'msg']) {
+        final value = map[key];
+        final extracted = _extractApiErrorMessage(value);
+        if (extracted != null && extracted.isNotEmpty) {
+          return extracted;
+        }
+      }
+
+      for (final value in map.values) {
+        final extracted = _extractApiErrorMessage(value);
+        if (extracted != null && extracted.isNotEmpty) {
+          return extracted;
+        }
+      }
+      return null;
+    }
+
+    if (node is Iterable) {
+      for (final item in node) {
+        final extracted = _extractApiErrorMessage(item);
+        if (extracted != null && extracted.isNotEmpty) {
+          return extracted;
+        }
+      }
+      return null;
+    }
+
+    final text = node.toString().trim();
+    return text.isEmpty ? null : text;
   }
 
   Future<String> _resolveStoredUserId() async {

@@ -37,21 +37,25 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_selectedIndex],
-      bottomNavigationBar: CurvedNavigationBar(
-        key: _bottomNavigationKey,
-        items: const [
-          Icon(Icons.home, color: AppColors.backgroundColor),
-          Icon(Icons.notifications, color: AppColors.backgroundColor),
-          Icon(Icons.person, color: AppColors.backgroundColor),
-        ],
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        backgroundColor: Colors.transparent,
-        color: AppColors.primaryColor,
-        buttonBackgroundColor: AppColors.primaryColor,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        maintainBottomViewPadding: true,
+        child: CurvedNavigationBar(
+          key: _bottomNavigationKey,
+          items: const [
+            Icon(Icons.home, color: AppColors.backgroundColor),
+            Icon(Icons.notifications, color: AppColors.backgroundColor),
+            Icon(Icons.person, color: AppColors.backgroundColor),
+          ],
+          onTap: (index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          },
+          backgroundColor: Colors.transparent,
+          color: AppColors.primaryColor,
+          buttonBackgroundColor: AppColors.primaryColor,
+        ),
       ),
     );
   }
@@ -70,7 +74,6 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
   @override
   void initState() {
     super.initState();
-    // Panggil fetchCurrentUser agar data profil terbaru selalu diambil saat home dibuka
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<UserProfileProvider>().fetchCurrentUser();
       final offlineProvider = context.read<OfflineProvider>();
@@ -128,8 +131,6 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
   Widget build(BuildContext context) {
     final profileProvider = context.watch<UserProfileProvider>();
     final user = profileProvider.selectedUser;
-
-    // Logika dinamis berdasarkan data dari provider
     final bool isProfileComplete = user?.isProfileComplete ?? false;
     return Scaffold(
       appBar: PreferredSize(
@@ -161,17 +162,16 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                 right: 16,
                 child: CircleAvatar(
                   radius: 35,
-                  backgroundColor: Colors.white,
+                  backgroundColor: AppColors.backgroundColor,
                   child: ClipOval(
                     child:
                         (user?.fotoProfilUrl != null &&
                             user!.fotoProfilUrl!.trim().isNotEmpty)
                         ? Image.network(
                             user.fotoProfilUrl!,
-                            width: 70, // Menyesuaikan diameter avatar (35 * 2)
+                            width: 70,
                             height: 70,
                             fit: BoxFit.cover,
-                            // Menangani error jika URL gambar rusak
                             errorBuilder: (context, error, stackTrace) {
                               return const Icon(
                                 Icons.broken_image,
@@ -179,7 +179,6 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
                                 color: AppColors.primaryColor,
                               );
                             },
-                            // Menampilkan loading saat gambar sedang diunduh
                             loadingBuilder: (context, child, loadingProgress) {
                               if (loadingProgress == null) return child;
                               return const Center(
@@ -206,16 +205,11 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
         child: profileProvider.isLoading
             ? const Center(child: CircularProgressIndicator())
             : isProfileComplete
-            ? const ContentRiwayatAbsensi() // Pastikan di dalam ini juga scrollable
+            ? const ContentRiwayatAbsensi()
             : SingleChildScrollView(
-                // <--- Tambahkan ini
-                physics:
-                    const AlwaysScrollableScrollPhysics(), // <--- WAJIB agar bisa ditarik
+                physics: const AlwaysScrollableScrollPhysics(),
                 child: Container(
-                  // Mengatur tinggi minimal agar memenuhi layar supaya bisa di-pull
-                  height:
-                      MediaQuery.of(context).size.height -
-                      500, // dikurangi tinggi AppBar
+                  height: MediaQuery.of(context).size.height - 500,
                   alignment: Alignment.center,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,

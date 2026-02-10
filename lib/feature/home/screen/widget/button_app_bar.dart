@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:saraspatika/core/constants/colors.dart';
 import 'package:saraspatika/core/shared_widgets/permission_guard.dart';
 import 'package:saraspatika/feature/login/data/provider/auth_provider.dart';
 import 'package:saraspatika/feature/profile/data/provider/user_profile_provider.dart';
@@ -53,7 +54,7 @@ class _ButtonAppBarState extends State<ButtonAppBar> {
                                     Icon(
                                       Icons.calendar_month,
                                       size: 30,
-                                      color: Color(0xFF92E3A9),
+                                      color: AppColors.secondaryBackgroundColor,
                                     ),
                                     SizedBox(height: 4),
                                     Text(
@@ -143,7 +144,7 @@ class _ButtonAppBarState extends State<ButtonAppBar> {
                                   Icon(
                                     Icons.power_settings_new_sharp,
                                     size: 30,
-                                    color: Colors.grey,
+                                    color: AppColors.hintColor,
                                   ),
                                   SizedBox(height: 4),
                                   Text(
@@ -181,7 +182,7 @@ class _ButtonAppBarState extends State<ButtonAppBar> {
                             Icon(
                               Icons.power_settings_new_sharp,
                               size: 30,
-                              color: Colors.grey,
+                              color: AppColors.hintColor,
                             ),
                             SizedBox(height: 4),
                             Text(
@@ -199,7 +200,10 @@ class _ButtonAppBarState extends State<ButtonAppBar> {
                         padding: EdgeInsets.all(13),
                         child: Text(
                           "Silakan lengkapi profil untuk mengakses menu.",
-                          style: TextStyle(color: Colors.grey, fontSize: 14),
+                          style: TextStyle(
+                            color: AppColors.hintColor,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ],

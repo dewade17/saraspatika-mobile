@@ -1,10 +1,14 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:ui';
+
+import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+
+enum _LivenessAction { blink, turnLeft, turnRight, lookCenter }
 
 class FaceDetectionScreen extends StatefulWidget {
   const FaceDetectionScreen({super.key});
@@ -14,19 +18,22 @@ class FaceDetectionScreen extends StatefulWidget {
 }
 
 class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
-  // Kamera & Detektor
   CameraController? _cameraController;
   late FaceDetector _faceDetector;
   final FlutterTts _tts = FlutterTts();
 
-  // State Kendali
   bool _isBusy = false;
   bool _isFaceInside = false;
   bool _verificationCompleted = false;
-  bool _hasGameStarted = false; // Flag untuk memulai instruksi pertama
+  bool _hasGameStarted = false;
 
   int _currentStep = 0;
   String _instructionText = "Posisikan wajah di dalam oval";
+
+  List<_LivenessAction> _plan = const [];
+  DateTime? _stepStartedAt;
+  bool _eyesWereClosed = false;
+  final Random _rnd = Random();
 
   @override
   void initState() {
@@ -36,13 +43,10 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
     _setupTts();
   }
 
-  // --- 1. INISIALISASI ---
-
   void _initializeDetector() {
     _faceDetector = FaceDetector(
       options: FaceDetectorOptions(
-        enableClassification:
-            true, // WAJIB: Untuk deteksi probabilitas mata terbuka
+        enableClassification: true,
         enableTracking: true,
         enableLandmarks: true,
       ),
@@ -68,11 +72,9 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
     );
 
     await _cameraController?.initialize();
-    _cameraController?.startImageStream(_processCameraImage);
+    await _cameraController?.startImageStream(_processCameraImage);
     if (mounted) setState(() {});
   }
-
-  // --- 2. LOGIKA DETEKSI (LIVENESS) ---
 
   void _processCameraImage(CameraImage image) async {
     if (_isBusy || _verificationCompleted) return;
@@ -88,13 +90,10 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
         final face = faces.first;
         if (mounted) setState(() => _isFaceInside = true);
 
-        // TRIGGER PERTAMA: Saat wajah masuk oval pertama kali
         if (!_hasGameStarted) {
-          _hasGameStarted = true;
-          _speak("Wajah terdeteksi. Silakan berkedip sekarang.");
+          _startLivenessSession();
         }
 
-        // Jalankan logika pengecekan gerakan
         _checkLiveness(face);
       } else {
         if (mounted) setState(() => _isFaceInside = false);
@@ -106,47 +105,125 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
     }
   }
 
-  void _checkLiveness(Face face) {
-    // Ambil probabilitas mata terbuka (0.0 sampai 1.0)
-    double leftEye = face.leftEyeOpenProbability ?? 1.0;
-    double rightEye = face.rightEyeOpenProbability ?? 1.0;
-    double headY = face.headEulerAngleY ?? 0; // Sudut horizontal kepala
+  List<_LivenessAction> _generatePlan() {
+    final core = <_LivenessAction>[
+      _LivenessAction.blink,
+      _LivenessAction.turnLeft,
+      _LivenessAction.turnRight,
+    ];
 
-    // STEP 0: Deteksi Berkedip
-    if (_currentStep == 0) {
-      // Threshold < 0.4 dianggap mata tertutup/berkedip
-      if (leftEye < 0.4 && rightEye < 0.4) {
-        _currentStep = 1;
-        _speak("Bagus! Sekarang toleh ke KIRI.");
+    final int len = 4 + _rnd.nextInt(2);
+    final plan = <_LivenessAction>[];
+
+    while (plan.length < len) {
+      plan.add(core[_rnd.nextInt(core.length)]);
+    }
+
+    if (!plan.contains(_LivenessAction.turnLeft)) {
+      plan[_rnd.nextInt(plan.length)] = _LivenessAction.turnLeft;
+    }
+    if (!plan.contains(_LivenessAction.turnRight)) {
+      plan[_rnd.nextInt(plan.length)] = _LivenessAction.turnRight;
+    }
+
+    plan.add(_LivenessAction.lookCenter);
+    return plan;
+  }
+
+  String _instructionFor(_LivenessAction action) {
+    switch (action) {
+      case _LivenessAction.blink:
+        return "Silakan berkedip sekarang.";
+      case _LivenessAction.turnLeft:
+        return "Sekarang toleh ke KIRI.";
+      case _LivenessAction.turnRight:
+        return "Sekarang toleh ke KANAN.";
+      case _LivenessAction.lookCenter:
+        return "Bagus, sekarang hadap ke depan kembali.";
+    }
+  }
+
+  void _startLivenessSession() {
+    _hasGameStarted = true;
+    _plan = _generatePlan();
+    _currentStep = 0;
+    _stepStartedAt = DateTime.now();
+    _eyesWereClosed = false;
+    _speak("Wajah terdeteksi. ${_instructionFor(_plan[_currentStep])}");
+  }
+
+  void _advanceStep() {
+    if (_verificationCompleted) return;
+
+    _currentStep++;
+    _stepStartedAt = DateTime.now();
+    _eyesWereClosed = false;
+
+    if (_currentStep >= _plan.length) {
+      _speak("Sempurna. Verifikasi berhasil.");
+      _onSuccess();
+      return;
+    }
+
+    _speak(_instructionFor(_plan[_currentStep]));
+  }
+
+  void _checkLiveness(Face face) {
+    if (_plan.isEmpty || _verificationCompleted) return;
+
+    final startedAt = _stepStartedAt;
+    if (startedAt != null) {
+      final elapsed = DateTime.now().difference(startedAt);
+      if (elapsed > const Duration(seconds: 7)) {
+        _restartVerificationFlow(
+          instruction:
+              "Waktu habis. Silakan ulangi verifikasi dari awal dan ikuti instruksi dengan cepat.",
+        );
+        return;
       }
     }
-    // STEP 1: Toleh Kiri
-    else if (_currentStep == 1) {
-      if (headY > 20) {
-        _currentStep = 2;
-        _speak("Oke, sekarang toleh ke KANAN.");
-      }
-    }
-    // STEP 2: Toleh Kanan
-    else if (_currentStep == 2) {
-      if (headY < -20) {
-        _currentStep = 3;
-        _speak("Bagus, sekarang hadap ke depan kembali.");
-      }
-    }
-    // STEP 3: Hadap Depan (Final Check)
-    else if (_currentStep == 3) {
-      if (headY > -5 && headY < 5) {
-        _currentStep = 4; // Step sukses
-        _speak("Sempurna. Verifikasi berhasil.");
-        _onSuccess();
-      }
+
+    final double leftEye = face.leftEyeOpenProbability ?? 1.0;
+    final double rightEye = face.rightEyeOpenProbability ?? 1.0;
+    final double headY = face.headEulerAngleY ?? 0;
+
+    final action = _plan[_currentStep];
+
+    switch (action) {
+      case _LivenessAction.blink:
+        final bothClosed = leftEye < 0.35 && rightEye < 0.35;
+        final bothOpen = leftEye > 0.70 && rightEye > 0.70;
+
+        if (!_eyesWereClosed && bothClosed) {
+          _eyesWereClosed = true;
+          return;
+        }
+
+        if (_eyesWereClosed && bothOpen) {
+          _advanceStep();
+        }
+        return;
+
+      case _LivenessAction.turnLeft:
+        if (headY > 20) _advanceStep();
+        return;
+
+      case _LivenessAction.turnRight:
+        if (headY < -20) _advanceStep();
+        return;
+
+      case _LivenessAction.lookCenter:
+        if (headY > -5 && headY < 5) _advanceStep();
+        return;
     }
   }
 
   Future<void> _speak(String text) async {
     if (!mounted) return;
     setState(() => _instructionText = text);
+    try {
+      await _tts.stop();
+    } catch (_) {}
     await _tts.speak(text);
   }
 
@@ -156,10 +233,29 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
 
     try {
       await _cameraController?.stopImageStream();
-      // Berikan delay sangat singkat agar frame kamera stabil di posisi depan
       await Future.delayed(const Duration(milliseconds: 300));
 
       final XFile photo = await _cameraController!.takePicture();
+      final inputImage = InputImage.fromFilePath(photo.path);
+      final faces = await _faceDetector.processImage(inputImage);
+
+      if (faces.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Wajah tidak terdeteksi pada foto. Silakan ulangi verifikasi.',
+            ),
+          ),
+        );
+
+        await _restartVerificationFlow(
+          instruction:
+              'Wajah tidak terdeteksi pada foto. Silakan ulangi verifikasi dari awal.',
+        );
+        return;
+      }
+
       if (!mounted) return;
       Navigator.pop(context, File(photo.path));
     } catch (e) {
@@ -171,7 +267,25 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
     }
   }
 
-  // --- 3. UI COMPONENTS ---
+  Future<void> _restartVerificationFlow({required String instruction}) async {
+    _verificationCompleted = false;
+    _hasGameStarted = false;
+    _isFaceInside = false;
+    _currentStep = 0;
+    _plan = const [];
+    _stepStartedAt = null;
+    _eyesWereClosed = false;
+
+    if (!mounted) return;
+    setState(() => _instructionText = instruction);
+    await _speak(instruction);
+
+    if (_cameraController != null &&
+        _cameraController!.value.isInitialized &&
+        !_cameraController!.value.isStreamingImages) {
+      await _cameraController!.startImageStream(_processCameraImage);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -257,14 +371,17 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
   }
 
   Widget _buildProgressBar() {
+    final int steps = _plan.isEmpty ? 4 : _plan.length;
+    final int current = _currentStep.clamp(0, steps);
+
     return Positioned(
       top: 130,
       left: 50,
       right: 50,
       child: Row(
-        children: List.generate(4, (index) {
-          bool isCompleted = index < _currentStep;
-          bool isCurrent = index == _currentStep;
+        children: List.generate(steps, (index) {
+          final bool isCompleted = index < current;
+          final bool isCurrent = index == current;
           return Expanded(
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 500),
@@ -327,32 +444,51 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
 
   Widget _buildStepIcon() {
     IconData iconData;
-    switch (_currentStep) {
-      case 0:
-        iconData = Icons.remove_red_eye_outlined; // Ikon mata untuk kedip
-        break;
-      case 1:
-        iconData = Icons.arrow_back_rounded;
-        break;
-      case 2:
-        iconData = Icons.arrow_forward_rounded;
-        break;
-      case 3:
-        iconData = Icons.face_retouching_natural_rounded;
-        break;
-      default:
-        iconData = Icons.check_circle_outline_rounded;
+
+    if (_plan.isNotEmpty && _currentStep < _plan.length) {
+      switch (_plan[_currentStep]) {
+        case _LivenessAction.blink:
+          iconData = Icons.remove_red_eye_outlined;
+          break;
+        case _LivenessAction.turnLeft:
+          iconData = Icons.arrow_back_rounded;
+          break;
+        case _LivenessAction.turnRight:
+          iconData = Icons.arrow_forward_rounded;
+          break;
+        case _LivenessAction.lookCenter:
+          iconData = Icons.face_retouching_natural_rounded;
+          break;
+      }
+    } else {
+      switch (_currentStep) {
+        case 0:
+          iconData = Icons.remove_red_eye_outlined;
+          break;
+        case 1:
+          iconData = Icons.arrow_back_rounded;
+          break;
+        case 2:
+          iconData = Icons.arrow_forward_rounded;
+          break;
+        case 3:
+          iconData = Icons.face_retouching_natural_rounded;
+          break;
+        default:
+          iconData = Icons.check_circle_outline_rounded;
+      }
     }
+
     return Icon(iconData, color: Colors.greenAccent, size: 40);
   }
 
   InputImage? _inputImageFromCameraImage(CameraImage image) {
     if (_cameraController == null) return null;
+
     final camera = _cameraController!.description;
     final sensorOrientation = camera.sensorOrientation;
-    InputImageRotation? rotation = InputImageRotationValue.fromRawValue(
-      sensorOrientation,
-    );
+
+    final rotation = InputImageRotationValue.fromRawValue(sensorOrientation);
     if (rotation == null) return null;
 
     final format = Platform.isAndroid

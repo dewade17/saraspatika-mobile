@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:saraspatika/feature/profile/data/provider/user_profile_provider.dart';
 
 class HeaderUserAppbar extends StatefulWidget {
   const HeaderUserAppbar({super.key});
@@ -7,22 +9,12 @@ class HeaderUserAppbar extends StatefulWidget {
   State<HeaderUserAppbar> createState() => _HeaderUserAppbarState();
 }
 
-class DummyUser {
-  final String name;
-  final String? fotoProfil;
-
-  const DummyUser({required this.name, this.fotoProfil});
-}
-
 class _HeaderUserAppbarState extends State<HeaderUserAppbar> {
-  // Dummy user
-  final DummyUser _user = const DummyUser(
-    name: 'I Putu Hendy Pradika, S.Pd',
-    fotoProfil: '',
-  );
-
   @override
   Widget build(BuildContext context) {
+    final profileProvider = context.watch<UserProfileProvider>();
+    final user = profileProvider.selectedUser;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -33,8 +25,9 @@ class _HeaderUserAppbarState extends State<HeaderUserAppbar> {
             fontWeight: FontWeight.bold,
           ),
         ),
+        const SizedBox(height: 2),
         Text(
-          _user.name,
+          user?.name ?? 'Memuat nama...',
           style: const TextStyle(
             fontSize: 17,
             color: Colors.white,
@@ -42,12 +35,12 @@ class _HeaderUserAppbarState extends State<HeaderUserAppbar> {
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
-          '',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+        Text(
+          user?.nip ?? '',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.white70,
           ),
         ),
         const SizedBox(height: 20),
