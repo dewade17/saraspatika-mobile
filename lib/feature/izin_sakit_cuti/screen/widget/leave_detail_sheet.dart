@@ -52,7 +52,7 @@ void showLeaveDetailBottomSheet({
                 const Divider(height: 24),
                 _detailRow(
                   icon: Icons.assignment,
-                  label: 'Jenis Izin',
+                  label: leave.jenisPengajuan,
                   value: leave.jenisPengajuan,
                 ),
                 const SizedBox(height: 8),
@@ -84,45 +84,45 @@ void showLeaveDetailBottomSheet({
                   'Bukti Pengajuan:',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 12),
-                if (leave.buktiKind == BuktiKind.image)
-                  Container(
-                    height: 180,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.black12),
-                      color: Colors.grey[50],
-                    ),
-                    child: const Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.image_outlined, size: 40),
-                          SizedBox(height: 8),
-                          Text('Preview Gambar (UI dummy)'),
-                        ],
+                  const SizedBox(height: 12),
+                  if (leave.buktiKind == BuktiKind.image)
+                    Container(
+                      height: 180,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.black12),
+                        color: Colors.grey[50],
                       ),
-                    ),
-                  )
-                else if (leave.buktiKind == BuktiKind.pdf)
-                  Card(
-                    color: Colors.red[50],
-                    child: ListTile(
-                      leading: const Icon(
-                        Icons.picture_as_pdf,
-                        color: Colors.red,
+                      child: const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.image_outlined, size: 40),
+                            SizedBox(height: 8),
+                            Text('Preview Gambar (UI dummy)'),
+                          ],
+                        ),
                       ),
-                      title: const Text('Bukti PDF'),
-                      subtitle: const Text('Klik untuk melihat (UI dummy)'),
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Open PDF (UI dummy)')),
-                        );
-                      },
-                    ),
-                  )
-                else
-                  const Text('Tidak ada bukti yang diunggah'),
+                    )
+                  else if (leave.buktiKind == BuktiKind.pdf)
+                    Card(
+                      color: Colors.red[50],
+                      child: ListTile(
+                        leading: const Icon(
+                          Icons.picture_as_pdf,
+                          color: Colors.red,
+                        ),
+                        title: const Text('Bukti PDF'),
+                        subtitle: const Text('Klik untuk melihat (UI dummy)'),
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Open PDF (UI dummy)')),
+                          );
+                        },
+                      ),
+                    )
+                  else
+                    const Text('Tidak ada bukti yang diunggah'),
               ],
             ),
           );

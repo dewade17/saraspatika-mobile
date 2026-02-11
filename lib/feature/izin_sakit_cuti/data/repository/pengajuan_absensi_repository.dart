@@ -42,7 +42,13 @@ class PengajuanAbsensiRepository {
     String? fotoBuktiUrl,
     AppPickedFile? fotoBukti,
   }) async {
-    final jenis = jenisPengajuan.trim().toUpperCase();
+    final payload = <String, String>{
+      'jenis_pengajuan': jenisPengajuan.trim().toUpperCase(),
+      'tanggal_mulai': tanggalMulai.trim(),
+      'tanggal_selesai': tanggalSelesai.trim(),
+      'alasan': alasan.trim(),
+      'foto_bukti_url': fotoBuktiUrl?.trim() ?? '',
+    };
 
     if (fotoBukti != null) {
       final bytes = await fotoBukti.file.readAsBytes();
@@ -55,15 +61,7 @@ class PengajuanAbsensiRepository {
       final res = await _api.multipart(
         Endpoints.pengajuanAbsensiS,
         method: 'POST',
-        fields: {
-          'jenis_pengajuan': jenis,
-          'tanggal_mulai': tanggalMulai.trim(),
-          'tanggal_selesai': tanggalSelesai.trim(),
-          'alasan': alasan.trim(),
-          'foto_bukti_url': (fotoBuktiUrl != null && fotoBuktiUrl.isNotEmpty)
-              ? fotoBuktiUrl
-              : '',
-        },
+        fields: payload,
         files: [uploadFile],
         useToken: true,
       );
@@ -74,13 +72,7 @@ class PengajuanAbsensiRepository {
     final res = await _api.post(
       Endpoints.pengajuanAbsensiS,
       useToken: true,
-      body: {
-        'jenis_pengajuan': jenis,
-        'tanggal_mulai': tanggalMulai.trim(),
-        'tanggal_selesai': tanggalSelesai.trim(),
-        'alasan': alasan.trim(),
-        'foto_bukti_url': fotoBuktiUrl?.trim() ?? '',
-      },
+      body: payload,
     );
 
     return _parseSingle(res);
