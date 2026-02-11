@@ -60,8 +60,9 @@ class PengajuanAbsensiRepository {
           'tanggal_mulai': tanggalMulai.trim(),
           'tanggal_selesai': tanggalSelesai.trim(),
           'alasan': alasan.trim(),
-          if (fotoBuktiUrl != null && fotoBuktiUrl.trim().isNotEmpty)
-            'foto_bukti_url': fotoBuktiUrl.trim(),
+          'foto_bukti_url': (fotoBuktiUrl != null && fotoBuktiUrl.isNotEmpty)
+              ? fotoBuktiUrl
+              : '',
         },
         files: [uploadFile],
         useToken: true,
@@ -78,8 +79,7 @@ class PengajuanAbsensiRepository {
         'tanggal_mulai': tanggalMulai.trim(),
         'tanggal_selesai': tanggalSelesai.trim(),
         'alasan': alasan.trim(),
-        if (fotoBuktiUrl != null && fotoBuktiUrl.trim().isNotEmpty)
-          'foto_bukti_url': fotoBuktiUrl.trim(),
+        'foto_bukti_url': fotoBuktiUrl?.trim() ?? '',
       },
     );
 

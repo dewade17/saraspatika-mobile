@@ -1,3 +1,5 @@
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:saraspatika/core/constants/colors.dart';
 import 'package:saraspatika/core/shared_widgets/app_button_widget.dart';
@@ -5,6 +7,7 @@ import 'package:saraspatika/core/shared_widgets/app_date_picker_field.dart';
 import 'package:saraspatika/core/shared_widgets/app_drop_down.dart';
 import 'package:saraspatika/core/shared_widgets/app_picked_file.dart';
 import 'package:saraspatika/core/shared_widgets/app_text_field.dart';
+import 'package:saraspatika/core/utils/image_compress_utils.dart';
 import 'package:saraspatika/feature/izin_sakit_cuti/data/provider/pengajuan_absensi_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -37,11 +40,53 @@ class _PengajuanScreenState extends State<PengajuanScreen> {
   }
 
   Future<void> _pickBukti() async {
-    await _buktiController.pickProfilePhoto(
+    // 1. Tampilkan dialog pemilihan sumber (Kamera, Galeri, atau File System)
+    final source = await AppFilePicker.showSourceChooser(
       context,
-      allowCamera: true,
-      allowGallery: true,
+      allowCamera: true, // Mendukung allowCamera
+      allowGallery: true, // Mendukung allowGallery
+      allowFileSystem: true, // Mendukung allowFileSystem
+      dialogTitle: 'Pilih Sumber Bukti',
     );
+
+    if (source == null) return;
+
+    List<AppPickedFile> picked = [];
+
+    try {
+      // 2. Lakukan pengambilan file berdasarkan sumber yang dipilih
+      switch (source) {
+        case AppFileSource.camera:
+          picked = await AppFilePicker.pickFromCamera(
+            context: context,
+            compressCameraImage: true,
+            cameraCompressOptions: const ImageCompressOptions(),
+          );
+          break;
+        case AppFileSource.gallery:
+          picked = await AppFilePicker.pickFromGallery(
+            context: context,
+            mode: AppFilePickerMode.imagesOnly,
+            allowMultiple: false,
+          );
+          break;
+        case AppFileSource.fileSystem:
+          picked = await AppFilePicker.pickFromFileSystem(
+            context: context,
+            mode: AppFilePickerMode.any,
+            fileType: FileType.any, // Memerlukan import file_picker
+            allowMultiple: false,
+          );
+          break;
+      }
+
+      // 3. Update controller jika ada file yang dipilih
+      if (picked.isNotEmpty) {
+        _buktiController.setFiles(picked);
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('Error picking file: $e');
+    }
   }
 
   String _formatDate(DateTime date) {
@@ -210,27 +255,89 @@ class _PengajuanScreenState extends State<PengajuanScreen> {
                                 enabled: !provider.isLoading,
                               ),
                               const SizedBox(height: 20),
-                              AppFilePickerField(
-                                controller: _buktiController,
-                                label: 'Bukti',
-                                hintText: 'Belum ada file diunggah',
-                                leadingIcon: Icons.insert_drive_file_outlined,
-                                enabled: !provider.isLoading,
-                                allowClear: true,
-                                allowCamera: true,
-                                allowGallery: true,
-                                allowFileSystem: true,
+                              ValueListenableBuilder(
+                                valueListenable: _buktiController,
+                                builder: (context, files, _) {
+                                  final hasFile = files.isNotEmpty;
+
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      // Tombol pemicu dengan desain yang kamu inginkan
+                                      AppButton(
+                                        text: hasFile
+                                            ? 'Ubah Bukti'
+                                            : 'Unggah Bukti',
+                                        variant: AppButtonVariant.outline,
+                                        leading: const Icon(
+                                          Icons.camera_alt_outlined,
+                                        ),
+                                        fullWidth: true,
+                                        enabled: !provider.isLoading,
+                                        onPressed: _pickBukti,
+                                      ),
+
+                                      // Tampilkan nama file jika sudah dipilih
+                                      if (hasFile) ...[
+                                        const SizedBox(height: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 8,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[100],
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.grey[300]!,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.insert_drive_file,
+                                                size: 20,
+                                                color: Colors.grey,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  files.first.path
+                                                      .split('/')
+                                                      .last,
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    color: Colors.black87,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(
+                                                  Icons.close,
+                                                  size: 20,
+                                                  color: Colors.red,
+                                                ),
+                                                onPressed: () =>
+                                                    _buktiController.clear(),
+                                                padding: EdgeInsets.zero,
+                                                constraints:
+                                                    const BoxConstraints(),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  );
+                                },
                               ),
+
                               const SizedBox(height: 32),
-                              AppButton(
-                                text: 'Unggah Bukti',
-                                variant: AppButtonVariant.outline,
-                                leading: const Icon(Icons.camera_alt_outlined),
-                                fullWidth: true,
-                                enabled: !provider.isLoading,
-                                onPressed: _pickBukti,
-                              ),
-                              const SizedBox(height: 16),
                               AppButton(
                                 text: 'Kirim Permintaan',
                                 variant: AppButtonVariant.primary,
