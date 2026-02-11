@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:saraspatika/core/constants/colors.dart';
+import 'package:saraspatika/feature/izin_sakit_cuti/data/provider/pengajuan_absensi_provider.dart';
 import 'package:saraspatika/feature/izin_sakit_cuti/screen/form_tambah_pengajuan/pengajuan_screen.dart';
-
 import 'widget/leave_card.dart';
 import 'widget/leave_detail_sheet.dart';
 import 'widget/leave_empty_state.dart';
@@ -15,139 +16,148 @@ class IzinSakitCuti extends StatefulWidget {
 }
 
 class _IzinSakitCutiState extends State<IzinSakitCuti> {
-  bool _isLoading = false;
   String? _errorMessage;
 
-  final List<LeaveRequestUiModel> _requests = [
-    LeaveRequestUiModel(
-      leaveId: '1',
-      jenisIzin: 'Sakit',
-      alasan: 'Demam tinggi dan butuh istirahat.',
-      tanggalMulai: DateTime.now().subtract(const Duration(days: 1)),
-      tanggalSelesai: DateTime.now(),
-      status: 'PENDING',
-      bukti: BuktiKind.image,
-    ),
-    LeaveRequestUiModel(
-      leaveId: '2',
-      jenisIzin: 'Cuti',
-      alasan: 'Acara keluarga.',
-      tanggalMulai: DateTime.now().subtract(const Duration(days: 10)),
-      tanggalSelesai: DateTime.now().subtract(const Duration(days: 8)),
-      status: 'APPROVED',
-      bukti: BuktiKind.pdf,
-    ),
-    LeaveRequestUiModel(
-      leaveId: '3',
-      jenisIzin: 'Izin',
-      alasan: 'Keperluan administrasi.',
-      tanggalMulai: DateTime.now().subtract(const Duration(days: 5)),
-      tanggalSelesai: DateTime.now().subtract(const Duration(days: 5)),
-      status: 'REJECTED',
-      bukti: BuktiKind.none,
-    ),
-  ];
-
-  Future<void> _refreshData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    await Future<void>.delayed(const Duration(milliseconds: 700));
-
-    setState(() {
-      _isLoading = false;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshData(showError: false);
     });
   }
 
-  void _confirmDelete(BuildContext context, LeaveRequestUiModel leave) {
-    showDialog(
+  Future<void> _refreshData({required bool showError}) async {
+    final provider = context.read<PengajuanAbsensiProvider>();
+
+    setState(() => _errorMessage = null);
+
+    try {
+      await provider.fetchMyPengajuan();
+    } catch (_) {
+      final message = provider.errorMessage ?? 'Gagal memuat data pengajuan.';
+      if (!mounted) return;
+      setState(() => _errorMessage = message);
+
+      if (showError) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      }
+    }
+  }
+
+  Future<void> _confirmDelete(LeaveRequestUiModel leave) async {
+    final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Konfirmasi Hapus'),
         content: const Text('Apakah Anda yakin ingin menghapus request ini?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
+            onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('Batal'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              setState(() {
-                _requests.removeWhere((e) => e.leaveId == leave.leaveId);
-              });
-            },
+            onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Hapus'),
           ),
         ],
       ),
     );
+
+    if (shouldDelete != true || !mounted) return;
+
+    final provider = context.read<PengajuanAbsensiProvider>();
+
+    try {
+      await provider.deletePengajuan(leave.leaveId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pengajuan berhasil dihapus.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      final message = provider.errorMessage ?? 'Gagal menghapus pengajuan.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 
   void _onEdit(LeaveRequestUiModel leave) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Edit ${leave.jenisIzin} (UI dummy)')),
+      SnackBar(content: Text('Edit ${leave.jenisIzin} belum tersedia.')),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: const Text('Cuti/Izin/Sakit'),
-        backgroundColor: AppColors.primaryColor,
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : (_errorMessage != null)
-          ? Center(child: Text(_errorMessage!))
-          : RefreshIndicator(
-              onRefresh: _refreshData,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      if (_requests.isEmpty) const LeaveEmptyState(),
-                      ..._requests.map((leave) {
-                        return LeaveCard(
-                          leave: leave,
-                          tanggalMulaiLabel: _formatDateOnly(
-                            leave.tanggalMulai,
-                          ),
-                          tanggalSelesaiLabel: _formatDateOnly(
-                            leave.tanggalSelesai,
-                          ),
-                          buktiLabel: _buktiLabel(leave.bukti),
-                          onTap: () => showLeaveDetailBottomSheet(
-                            context: context,
-                            leave: leave,
-                            formatDateOnly: _formatDateOnly,
-                          ),
-                          onEdit: () => _onEdit(leave),
-                          onDelete: () => _confirmDelete(context, leave),
-                        );
-                      }),
-                    ],
+    return Consumer<PengajuanAbsensiProvider>(
+      builder: (context, provider, _) {
+        final requests = provider.items
+            .map(LeaveRequestUiModel.fromPengajuan)
+            .toList();
+
+        return Scaffold(
+          appBar: AppBar(
+            centerTitle: true,
+            title: const Text('Cuti/Izin/Sakit'),
+            backgroundColor: AppColors.primaryColor,
+          ),
+          body: provider.isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : (_errorMessage != null)
+              ? Center(child: Text(_errorMessage!))
+              : RefreshIndicator(
+                  onRefresh: () => _refreshData(showError: true),
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          if (requests.isEmpty) const LeaveEmptyState(),
+                          ...requests.map((leave) {
+                            return LeaveCard(
+                              leave: leave,
+                              tanggalMulaiLabel: _formatDateOnly(
+                                leave.tanggalMulai,
+                              ),
+                              tanggalSelesaiLabel: _formatDateOnly(
+                                leave.tanggalSelesai,
+                              ),
+                              buktiLabel: _buktiLabel(leave.bukti),
+                              onTap: () => showLeaveDetailBottomSheet(
+                                context: context,
+                                leave: leave,
+                                formatDateOnly: _formatDateOnly,
+                              ),
+                              onEdit: () => _onEdit(leave),
+                              onDelete: () => _confirmDelete(leave),
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'fab_izin_sakit_cuti',
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const PengajuanScreen()),
-          );
-        },
-        backgroundColor: AppColors.primaryColor,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
+          floatingActionButton: FloatingActionButton(
+            heroTag: 'fab_izin_sakit_cuti',
+            onPressed: () async {
+              final created = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(builder: (_) => const PengajuanScreen()),
+              );
+
+              if (created == true && mounted) {
+                await _refreshData(showError: true);
+              }
+            },
+            backgroundColor: AppColors.primaryColor,
+            child: const Icon(Icons.add, color: Colors.white),
+          ),
+        );
+      },
     );
   }
 

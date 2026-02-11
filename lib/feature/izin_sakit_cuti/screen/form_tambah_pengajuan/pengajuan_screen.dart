@@ -5,6 +5,8 @@ import 'package:saraspatika/core/shared_widgets/app_date_picker_field.dart';
 import 'package:saraspatika/core/shared_widgets/app_drop_down.dart';
 import 'package:saraspatika/core/shared_widgets/app_picked_file.dart';
 import 'package:saraspatika/core/shared_widgets/app_text_field.dart';
+import 'package:saraspatika/feature/izin_sakit_cuti/data/provider/pengajuan_absensi_provider.dart';
+import 'package:provider/provider.dart';
 
 class PengajuanScreen extends StatefulWidget {
   const PengajuanScreen({super.key});
@@ -23,13 +25,94 @@ class _PengajuanScreenState extends State<PengajuanScreen> {
       ValueNotifier<List<DateTime>>(<DateTime>[]);
 
   final AppFilePickerController _buktiController = AppFilePickerController();
+  final TextEditingController _alasanController = TextEditingController();
 
   @override
   void dispose() {
     _mulaiDates.dispose();
     _selesaiDates.dispose();
     _buktiController.dispose();
+    _alasanController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickBukti() async {
+    await _buktiController.pickProfilePhoto(
+      context,
+      allowCamera: true,
+      allowGallery: true,
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
+  Future<void> _submit(PengajuanAbsensiProvider provider) async {
+    final mulai = _mulaiDates.value.isNotEmpty ? _mulaiDates.value.first : null;
+    final selesai = _selesaiDates.value.isNotEmpty
+        ? _selesaiDates.value.first
+        : null;
+
+    if (_selectedJenisIzin == null || _selectedJenisIzin!.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Jenis izin wajib dipilih.')),
+      );
+      return;
+    }
+
+    if (mulai == null || selesai == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tanggal mulai dan selesai wajib diisi.')),
+      );
+      return;
+    }
+
+    if (selesai.isBefore(mulai)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tanggal selesai tidak boleh lebih awal dari mulai.'),
+        ),
+      );
+      return;
+    }
+
+    final alasan = _alasanController.text.trim();
+    if (alasan.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Alasan wajib diisi.')));
+      return;
+    }
+
+    final bukti = _buktiController.value.isNotEmpty
+        ? _buktiController.value.first
+        : null;
+
+    try {
+      await provider.createPengajuan(
+        jenisPengajuan: _selectedJenisIzin!,
+        tanggalMulai: _formatDate(mulai),
+        tanggalSelesai: _formatDate(selesai),
+        alasan: alasan,
+        fotoBukti: bukti,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pengajuan berhasil dikirim.')),
+      );
+      Navigator.of(context).pop(true);
+    } catch (_) {
+      if (!mounted) return;
+      final message = provider.errorMessage ?? 'Gagal mengirim pengajuan.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 
   @override
@@ -38,147 +121,137 @@ class _PengajuanScreenState extends State<PengajuanScreen> {
     final firstDate = DateTime(now.year - 5, 1, 1);
     final lastDate = DateTime(now.year + 5, 12, 31);
 
-    return Scaffold(
-      appBar: AppBar(backgroundColor: AppColors.primaryColor),
-      body: SafeArea(
-        child: GestureDetector(
-          onTap: () => FocusScope.of(context).unfocus(),
-          child: SingleChildScrollView(
-            padding: EdgeInsets.zero,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // HEADER (ikut scroll)
-                Container(
-                  height: 200,
-                  color: AppColors.primaryColor,
-                  child: const Padding(
-                    padding: EdgeInsets.only(top: 30, left: 70, right: 70),
-                    child: Text(
-                      "Form Permohonan Cuti/Izin/Sakit",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
+    return Consumer<PengajuanAbsensiProvider>(
+      builder: (context, provider, _) {
+        return Scaffold(
+          appBar: AppBar(backgroundColor: AppColors.primaryColor),
+          body: SafeArea(
+            child: GestureDetector(
+              onTap: () => FocusScope.of(context).unfocus(),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      height: 200,
+                      color: AppColors.primaryColor,
+                      child: const Padding(
+                        padding: EdgeInsets.only(top: 30, left: 70, right: 70),
+                        child: Text(
+                          'Form Permohonan Cuti/Izin/Sakit',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-
-                // FORM CARD (ditarik naik biar overlap header)
-                Transform.translate(
-                  offset: const Offset(0, -70),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const SizedBox(height: 24),
-
-                          AppDropdownField<String>(
-                            items: _jenisIzinList,
-                            mode: AppDropdownSelectionMode.single,
-                            initialValue: _selectedJenisIzin == null
-                                ? null
-                                : <String>[_selectedJenisIzin!],
-                            label: 'Jenis Izin',
-                            leadingIcon: Icons.list_alt,
-                            enabled: false,
-                            onSingleChanged: (val) {
-                              setState(() => _selectedJenisIzin = val);
-                            },
+                    Transform.translate(
+                      offset: const Offset(0, -70),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
                           ),
-
-                          const SizedBox(height: 20),
-
-                          AppDatePickerField(
-                            controller: _mulaiDates,
-                            mode: AppDateSelectionMode.single,
-                            firstDate: firstDate,
-                            lastDate: lastDate,
-                            label: 'Mulai',
-                            hintText: 'YYYY-MM-DD',
-                            leadingIcon: Icons.date_range,
-                            enabled: false,
-                            allowClear: false,
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const SizedBox(height: 24),
+                              AppDropdownField<String>(
+                                items: _jenisIzinList,
+                                mode: AppDropdownSelectionMode.single,
+                                initialValue: _selectedJenisIzin == null
+                                    ? null
+                                    : <String>[_selectedJenisIzin!],
+                                label: 'Jenis Izin',
+                                leadingIcon: Icons.list_alt,
+                                enabled: !provider.isLoading,
+                                onSingleChanged: (val) {
+                                  setState(() => _selectedJenisIzin = val);
+                                },
+                              ),
+                              const SizedBox(height: 20),
+                              AppDatePickerField(
+                                controller: _mulaiDates,
+                                mode: AppDateSelectionMode.single,
+                                firstDate: firstDate,
+                                lastDate: lastDate,
+                                label: 'Mulai',
+                                hintText: 'YYYY-MM-DD',
+                                leadingIcon: Icons.date_range,
+                                enabled: !provider.isLoading,
+                                allowClear: true,
+                              ),
+                              const SizedBox(height: 20),
+                              AppDatePickerField(
+                                controller: _selesaiDates,
+                                mode: AppDateSelectionMode.single,
+                                firstDate: firstDate,
+                                lastDate: lastDate,
+                                label: 'Selesai',
+                                hintText: 'YYYY-MM-DD',
+                                leadingIcon: Icons.date_range_outlined,
+                                enabled: !provider.isLoading,
+                                allowClear: true,
+                              ),
+                              const SizedBox(height: 20),
+                              AppTextField(
+                                controller: _alasanController,
+                                label: 'Alasan',
+                                leadingIcon: Icons.comment,
+                                maxLines: 3,
+                                enabled: !provider.isLoading,
+                              ),
+                              const SizedBox(height: 20),
+                              AppFilePickerField(
+                                controller: _buktiController,
+                                label: 'Bukti',
+                                hintText: 'Belum ada file diunggah',
+                                leadingIcon: Icons.insert_drive_file_outlined,
+                                enabled: !provider.isLoading,
+                                allowClear: true,
+                                allowCamera: true,
+                                allowGallery: true,
+                                allowFileSystem: true,
+                              ),
+                              const SizedBox(height: 32),
+                              AppButton(
+                                text: 'Unggah Bukti',
+                                variant: AppButtonVariant.outline,
+                                leading: const Icon(Icons.camera_alt_outlined),
+                                fullWidth: true,
+                                enabled: !provider.isLoading,
+                                onPressed: _pickBukti,
+                              ),
+                              const SizedBox(height: 16),
+                              AppButton(
+                                text: 'Kirim Permintaan',
+                                variant: AppButtonVariant.primary,
+                                fullWidth: true,
+                                enabled: !provider.isLoading,
+                                isLoading: provider.isLoading,
+                                onPressed: () => _submit(provider),
+                              ),
+                            ],
                           ),
-
-                          const SizedBox(height: 20),
-
-                          AppDatePickerField(
-                            controller: _selesaiDates,
-                            mode: AppDateSelectionMode.single,
-                            firstDate: firstDate,
-                            lastDate: lastDate,
-                            label: 'Selesai',
-                            hintText: 'YYYY-MM-DD',
-                            leadingIcon: Icons.date_range_outlined,
-                            enabled: false,
-                            allowClear: false,
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          const AppTextField(
-                            label: 'Alasan',
-                            leadingIcon: Icons.comment,
-                            maxLines: 3,
-                            enabled: false,
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          AppFilePickerField(
-                            controller: _buktiController,
-                            label: 'Bukti',
-                            hintText: 'Belum ada file diunggah',
-                            leadingIcon: Icons.insert_drive_file_outlined,
-                            enabled: false,
-                            allowClear: false,
-                            allowCamera: true,
-                            allowGallery: true,
-                            allowFileSystem: true,
-                          ),
-
-                          const SizedBox(height: 32),
-
-                          const AppButton(
-                            text: 'Unggah Bukti',
-                            variant: AppButtonVariant.outline,
-                            leading: Icon(Icons.camera_alt_outlined),
-                            fullWidth: true,
-                            enabled: false,
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          const AppButton(
-                            text: 'Kirim Permintaan',
-                            variant: AppButtonVariant.primary,
-                            fullWidth: true,
-                            enabled: false,
-                          ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 24),
+                  ],
                 ),
-
-                // ruang bawah biar enak
-                const SizedBox(height: 24),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
