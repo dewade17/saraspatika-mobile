@@ -32,4 +32,7 @@ class Endpoints {
 
   //face-reset-requests
   static const String faceResetRequests = "$baseURL/face-reset-request";
+
+  //absensi-history
+  static const String absensiHistory = "$baseURL/absensi";
 }

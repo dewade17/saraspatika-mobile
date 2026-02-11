@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart'; // Tambahkan import provider
+import 'package:saraspatika/feature/home/data/provider/history_kehadiran_provider.dart'; // Import provider Anda
 
 class ContentRiwayatAbsensi extends StatefulWidget {
   const ContentRiwayatAbsensi({super.key});
@@ -16,14 +18,30 @@ class _ContentRiwayatAbsensiState extends State<ContentRiwayatAbsensi> {
   void initState() {
     super.initState();
     now = DateTime.now();
-    tanggalFormatted = DateFormat(
-      'EEEE, dd MMMM yyyy',
-      'id_ID',
-    ).format(now);
+    tanggalFormatted = DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(now);
+
+    // Memicu pengambilan data saat widget dimuat
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<HistoryKehadiranProvider>().fetchMyHistory(limit: 1);
+    });
+  }
+
+  // Fungsi helper untuk memformat waktu dari DateTime
+  String formatTime(DateTime? dateTime) {
+    if (dateTime == null) return "--:--";
+    return DateFormat('HH:mm').format(dateTime);
   }
 
   @override
   Widget build(BuildContext context) {
+    // Mendengarkan perubahan data pada provider
+    final historyProvider = context.watch<HistoryKehadiranProvider>();
+
+    // Mengambil data terbaru jika tersedia
+    final latestAttendance = historyProvider.history.isNotEmpty
+        ? historyProvider.history.first
+        : null;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -75,8 +93,8 @@ class _ContentRiwayatAbsensiState extends State<ContentRiwayatAbsensi> {
                         const SizedBox(width: 8),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text(
+                          children: [
+                            const Text(
                               "Jam Masuk",
                               style: TextStyle(
                                 fontSize: 12,
@@ -84,8 +102,9 @@ class _ContentRiwayatAbsensiState extends State<ContentRiwayatAbsensi> {
                               ),
                             ),
                             Text(
-                              "08:00",
-                              style: TextStyle(
+                              // Data dinamis dari provider
+                              formatTime(latestAttendance?.waktuMasuk),
+                              style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
                               ),
@@ -104,8 +123,8 @@ class _ContentRiwayatAbsensiState extends State<ContentRiwayatAbsensi> {
                         const SizedBox(width: 8),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text(
+                          children: [
+                            const Text(
                               "Jam Pulang",
                               style: TextStyle(
                                 fontSize: 12,
@@ -113,8 +132,9 @@ class _ContentRiwayatAbsensiState extends State<ContentRiwayatAbsensi> {
                               ),
                             ),
                             Text(
-                              "16:00",
-                              style: TextStyle(
+                              // Data dinamis dari provider
+                              formatTime(latestAttendance?.waktuPulang),
+                              style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
                               ),
