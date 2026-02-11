@@ -8,11 +8,15 @@ import 'package:saraspatika/core/shared_widgets/app_drop_down.dart';
 import 'package:saraspatika/core/shared_widgets/app_picked_file.dart';
 import 'package:saraspatika/core/shared_widgets/app_text_field.dart';
 import 'package:saraspatika/core/utils/image_compress_utils.dart';
+import 'package:saraspatika/feature/izin_sakit_cuti/data/dto/pengajuan_absensi.dart';
 import 'package:saraspatika/feature/izin_sakit_cuti/data/provider/pengajuan_absensi_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart'; // Tambahkan ini
 
 class PengajuanScreen extends StatefulWidget {
-  const PengajuanScreen({super.key});
+  const PengajuanScreen({super.key, this.existingData});
+
+  final PengajuanData? existingData;
 
   @override
   State<PengajuanScreen> createState() => _PengajuanScreenState();
@@ -30,6 +34,21 @@ class _PengajuanScreenState extends State<PengajuanScreen> {
   final AppFilePickerController _buktiController = AppFilePickerController();
   final TextEditingController _alasanController = TextEditingController();
 
+  bool get _isEditing => widget.existingData != null;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final existing = widget.existingData;
+    if (existing == null) return;
+
+    _selectedJenisIzin = existing.jenisPengajuan.trim().toUpperCase();
+    _mulaiDates.value = <DateTime>[existing.tanggalMulai];
+    _selesaiDates.value = <DateTime>[existing.tanggalSelesai];
+    _alasanController.text = existing.alasan;
+  }
+
   @override
   void dispose() {
     _mulaiDates.dispose();
@@ -40,12 +59,11 @@ class _PengajuanScreenState extends State<PengajuanScreen> {
   }
 
   Future<void> _pickBukti() async {
-    // 1. Tampilkan dialog pemilihan sumber (Kamera, Galeri, atau File System)
     final source = await AppFilePicker.showSourceChooser(
       context,
-      allowCamera: true, // Mendukung allowCamera
-      allowGallery: true, // Mendukung allowGallery
-      allowFileSystem: true, // Mendukung allowFileSystem
+      allowCamera: true,
+      allowGallery: true,
+      allowFileSystem: true,
       dialogTitle: 'Pilih Sumber Bukti',
     );
 
@@ -54,7 +72,6 @@ class _PengajuanScreenState extends State<PengajuanScreen> {
     List<AppPickedFile> picked = [];
 
     try {
-      // 2. Lakukan pengambilan file berdasarkan sumber yang dipilih
       switch (source) {
         case AppFileSource.camera:
           picked = await AppFilePicker.pickFromCamera(
@@ -74,13 +91,12 @@ class _PengajuanScreenState extends State<PengajuanScreen> {
           picked = await AppFilePicker.pickFromFileSystem(
             context: context,
             mode: AppFilePickerMode.any,
-            fileType: FileType.any, // Memerlukan import file_picker
+            fileType: FileType.any,
             allowMultiple: false,
           );
           break;
       }
 
-      // 3. Update controller jika ada file yang dipilih
       if (picked.isNotEmpty) {
         _buktiController.setFiles(picked);
       }
@@ -138,22 +154,46 @@ class _PengajuanScreenState extends State<PengajuanScreen> {
         : null;
 
     try {
-      await provider.createPengajuan(
-        jenisPengajuan: _selectedJenisIzin!,
-        tanggalMulai: _formatDate(mulai),
-        tanggalSelesai: _formatDate(selesai),
-        alasan: alasan,
-        fotoBukti: bukti,
-      );
+      if (_isEditing) {
+        await provider.updatePengajuan(
+          widget.existingData!.idPengajuan,
+          jenisPengajuan: _selectedJenisIzin!,
+          tanggalMulai: _formatDate(mulai),
+          tanggalSelesai: _formatDate(selesai),
+          alasan: alasan,
+          fotoBukti: bukti,
+          fotoBuktiUrl: bukti == null
+              ? widget.existingData!.fotoBuktiUrl
+              : null,
+        );
+      } else {
+        await provider.createPengajuan(
+          jenisPengajuan: _selectedJenisIzin!,
+          tanggalMulai: _formatDate(mulai),
+          tanggalSelesai: _formatDate(selesai),
+          alasan: alasan,
+          fotoBukti: bukti,
+        );
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pengajuan berhasil dikirim.')),
+        SnackBar(
+          content: Text(
+            _isEditing
+                ? 'Pengajuan berhasil diperbarui.'
+                : 'Pengajuan berhasil dikirim.',
+          ),
+        ),
       );
       Navigator.of(context).pop(true);
     } catch (_) {
       if (!mounted) return;
-      final message = provider.errorMessage ?? 'Gagal mengirim pengajuan.';
+      final message =
+          provider.errorMessage ??
+          (_isEditing
+              ? 'Gagal memperbarui pengajuan.'
+              : 'Gagal mengirim pengajuan.');
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
@@ -264,11 +304,12 @@ class _PengajuanScreenState extends State<PengajuanScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      // Tombol pemicu dengan desain yang kamu inginkan
                                       AppButton(
                                         text: hasFile
                                             ? 'Ubah Bukti'
-                                            : 'Unggah Bukti',
+                                            : (_isEditing
+                                                  ? 'Unggah Bukti Baru'
+                                                  : 'Unggah Bukti'),
                                         variant: AppButtonVariant.outline,
                                         leading: const Icon(
                                           Icons.camera_alt_outlined,
@@ -277,8 +318,92 @@ class _PengajuanScreenState extends State<PengajuanScreen> {
                                         enabled: !provider.isLoading,
                                         onPressed: _pickBukti,
                                       ),
+                                      // Bagian Bukti Sebelumnya (Visual Preview)
+                                      if (!hasFile &&
+                                          _isEditing &&
+                                          (widget.existingData!.fotoBuktiUrl
+                                              .trim()
+                                              .isNotEmpty)) ...[
+                                        const SizedBox(height: 20),
+                                        const Text(
+                                          'Bukti Sebelumnya:',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
 
-                                      // Tampilkan nama file jika sudah dipilih
+                                        // Gaya Kartu untuk Bukti Gambar
+                                        if (widget.existingData!.buktiKind ==
+                                            BuktiKind.image)
+                                          Card(
+                                            margin: EdgeInsets.zero,
+                                            color: Colors
+                                                .blue[50], // Biru muda untuk Gambar
+                                            child: ListTile(
+                                              leading: const Icon(
+                                                Icons.image,
+                                                color: Colors.blue,
+                                              ),
+                                              title: const Text('Bukti Gambar'),
+                                              subtitle: const Text(
+                                                'Klik untuk melihat gambar',
+                                              ),
+                                              onTap: () async {
+                                                final uri = Uri.tryParse(
+                                                  widget
+                                                      .existingData!
+                                                      .fotoBuktiUrl,
+                                                );
+                                                if (uri != null &&
+                                                    await canLaunchUrl(uri)) {
+                                                  await launchUrl(
+                                                    uri,
+                                                    mode: LaunchMode
+                                                        .externalApplication,
+                                                  );
+                                                }
+                                              },
+                                            ),
+                                          )
+                                        // Gaya Kartu untuk Bukti PDF
+                                        else if (widget
+                                                .existingData!
+                                                .buktiKind ==
+                                            BuktiKind.pdf)
+                                          Card(
+                                            margin: EdgeInsets.zero,
+                                            color: Colors
+                                                .red[50], // Merah muda untuk PDF
+                                            child: ListTile(
+                                              leading: const Icon(
+                                                Icons.picture_as_pdf,
+                                                color: Colors.red,
+                                              ),
+                                              title: const Text('Bukti PDF'),
+                                              subtitle: const Text(
+                                                'Klik untuk melihat',
+                                              ),
+                                              onTap: () async {
+                                                final uri = Uri.tryParse(
+                                                  widget
+                                                      .existingData!
+                                                      .fotoBuktiUrl,
+                                                );
+                                                if (uri != null &&
+                                                    await canLaunchUrl(uri)) {
+                                                  await launchUrl(
+                                                    uri,
+                                                    mode: LaunchMode
+                                                        .externalApplication,
+                                                  );
+                                                }
+                                              },
+                                            ),
+                                          ),
+                                      ],
+                                      // Tampilkan nama file jika baru dipilih
                                       if (hasFile) ...[
                                         const SizedBox(height: 8),
                                         Container(
@@ -310,7 +435,6 @@ class _PengajuanScreenState extends State<PengajuanScreen> {
                                                       .last,
                                                   style: const TextStyle(
                                                     fontSize: 14,
-                                                    color: Colors.black87,
                                                   ),
                                                   overflow:
                                                       TextOverflow.ellipsis,
@@ -336,10 +460,11 @@ class _PengajuanScreenState extends State<PengajuanScreen> {
                                   );
                                 },
                               ),
-
                               const SizedBox(height: 32),
                               AppButton(
-                                text: 'Kirim Permintaan',
+                                text: _isEditing
+                                    ? 'Simpan Perubahan'
+                                    : 'Kirim Permintaan',
                                 variant: AppButtonVariant.primary,
                                 fullWidth: true,
                                 enabled: !provider.isLoading,

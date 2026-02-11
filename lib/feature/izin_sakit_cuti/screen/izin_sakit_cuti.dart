@@ -84,10 +84,15 @@ class _IzinSakitCutiState extends State<IzinSakitCuti> {
     }
   }
 
-  void _onEdit(PengajuanData leave) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Edit ${leave.jenisPengajuan} belum tersedia.')),
+  Future<void> _onEdit(PengajuanData leave) async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => PengajuanScreen(existingData: leave)),
     );
+
+    if (updated == true && mounted) {
+      await _refreshData(showError: true);
+    }
   }
 
   @override
@@ -129,7 +134,7 @@ class _IzinSakitCutiState extends State<IzinSakitCuti> {
                                 leave: leave,
                                 formatDateOnly: _formatDateOnly,
                               ),
-                              onEdit: () => _onEdit(leave),
+                              onEdit: () async => _onEdit(leave),
                               onDelete: () => _confirmDelete(leave),
                             );
                           }),

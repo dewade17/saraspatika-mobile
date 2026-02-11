@@ -80,6 +80,15 @@ void showLeaveDetailBottomSheet({
                   label: 'Status',
                   value: leave.status,
                 ),
+                if (leave.adminNote != null &&
+                    leave.adminNote!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _detailRow(
+                    icon: Icons.comment_bank_outlined,
+                    label: 'Catatan Admin',
+                    value: leave.adminNote!,
+                  ),
+                ],
                 const Divider(height: 32),
                 const Text(
                   'Bukti Pengajuan:',
@@ -87,48 +96,47 @@ void showLeaveDetailBottomSheet({
                 ),
                 const SizedBox(height: 12),
                 if (leave.buktiKind == BuktiKind.image)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      leave.fotoBuktiUrl,
-                      height: 180,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) {
-                          return child;
+                  Card(
+                    color: Colors
+                        .blue[50], // Warna biru muda untuk membedakan dengan PDF
+                    child: ListTile(
+                      leading: const Icon(Icons.image, color: Colors.blue),
+                      title: const Text('Bukti Gambar'),
+                      subtitle: const Text(
+                        'Klik untuk melihat atau mengunduh gambar',
+                      ),
+                      onTap: () async {
+                        final imageUri = Uri.tryParse(leave.fotoBuktiUrl);
+
+                        if (imageUri == null) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Link gambar tidak valid'),
+                              ),
+                            );
+                          }
+                          return;
                         }
 
-                        return SizedBox(
-                          height: 180,
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              value: loadingProgress.expectedTotalBytes != null
-                                  ? loadingProgress.cumulativeBytesLoaded /
-                                        loadingProgress.expectedTotalBytes!
-                                  : null,
-                            ),
-                          ),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          height: 180,
-                          width: double.infinity,
-                          color: Colors.grey[100],
-                          alignment: Alignment.center,
-                          child: const Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.broken_image_outlined, size: 40),
-                              SizedBox(height: 8),
-                              Text('Gagal memuat gambar bukti'),
-                            ],
-                          ),
-                        );
+                        if (await canLaunchUrl(imageUri)) {
+                          await launchUrl(
+                            imageUri,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        } else {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Tidak bisa membuka gambar'),
+                              ),
+                            );
+                          }
+                        }
                       },
                     ),
                   )
+                // Tampilan untuk PDF (Tetap seperti semula)
                 else if (leave.buktiKind == BuktiKind.pdf)
                   Card(
                     color: Colors.red[50],
@@ -153,22 +161,12 @@ void showLeaveDetailBottomSheet({
                           return;
                         }
 
-                        final canOpenPdf = await canLaunchUrl(pdfUri);
-                        if (!canOpenPdf) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Tidak bisa membuka file PDF'),
-                              ),
-                            );
-                          }
-                          return;
+                        if (await canLaunchUrl(pdfUri)) {
+                          await launchUrl(
+                            pdfUri,
+                            mode: LaunchMode.externalApplication,
+                          );
                         }
-
-                        await launchUrl(
-                          pdfUri,
-                          mode: LaunchMode.externalApplication,
-                        );
                       },
                     ),
                   )

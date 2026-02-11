@@ -9,7 +9,7 @@ class LeaveStatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Chip(
       label: Text(
-        (status ?? 'PENDING').toUpperCase(),
+        (status ?? 'MENUNGGU').toUpperCase(),
         style: const TextStyle(color: Colors.white),
       ),
       backgroundColor: _statusColor(status),
@@ -17,11 +17,10 @@ class LeaveStatusBadge extends StatelessWidget {
   }
 
   Color _statusColor(String? status) {
-    final s = (status ?? 'PENDING').toUpperCase();
-    if (s == 'PENDING') return Colors.orange;
-    if (s == 'APPROVED') return Colors.green;
-    if (s == 'REJECTED') return Colors.redAccent;
+    final s = (status ?? 'MENUNGGU').toUpperCase();
+    if (s == 'MENUNGGU') return Colors.orange;
+    if (s == 'SETUJU') return Colors.green;
+    if (s == 'DITOLAK') return Colors.redAccent;
     return Colors.blueGrey;
   }
 }
-  

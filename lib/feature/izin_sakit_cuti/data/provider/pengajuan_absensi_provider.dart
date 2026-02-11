@@ -192,6 +192,50 @@ class PengajuanAbsensiProvider extends ChangeNotifier {
     }
   }
 
+  Future<PengajuanData> updatePengajuan(
+    String idPengajuan, {
+    required String jenisPengajuan,
+    required String tanggalMulai,
+    required String tanggalSelesai,
+    required String alasan,
+    String? fotoBuktiUrl,
+    AppPickedFile? fotoBukti,
+  }) async {
+    _setLoading(true);
+    _errorMessage = null;
+
+    try {
+      final updated = await _repository.updatePengajuan(
+        idPengajuan,
+        jenisPengajuan: jenisPengajuan,
+        tanggalMulai: tanggalMulai,
+        tanggalSelesai: tanggalSelesai,
+        alasan: alasan,
+        fotoBuktiUrl: fotoBuktiUrl,
+        fotoBukti: fotoBukti,
+      );
+
+      _selected = updated;
+      final index = _items.indexWhere(
+        (item) => item.idPengajuan == updated.idPengajuan,
+      );
+      if (index >= 0) {
+        final nextItems = List<PengajuanData>.from(_items);
+        nextItems[index] = updated;
+        _items = nextItems;
+      } else {
+        _items = [updated, ..._items];
+      }
+      notifyListeners();
+      return updated;
+    } catch (e) {
+      _errorMessage = _friendlyError(e);
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   Future<PengajuanData> deletePengajuan(String idPengajuan) async {
     _setLoading(true);
     _errorMessage = null;

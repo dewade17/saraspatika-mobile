@@ -95,6 +95,51 @@ class PengajuanAbsensiRepository {
     return _parseSingle(res);
   }
 
+  Future<PengajuanData> updatePengajuan(
+    String idPengajuan, {
+    required String jenisPengajuan,
+    required String tanggalMulai,
+    required String tanggalSelesai,
+    required String alasan,
+    String? fotoBuktiUrl,
+    AppPickedFile? fotoBukti,
+  }) async {
+    final payload = <String, String>{
+      'jenis_pengajuan': jenisPengajuan.trim().toUpperCase(),
+      'tanggal_mulai': tanggalMulai.trim(),
+      'tanggal_selesai': tanggalSelesai.trim(),
+      'alasan': alasan.trim(),
+      if (fotoBuktiUrl != null) 'foto_bukti_url': fotoBuktiUrl.trim(),
+    };
+
+    if (fotoBukti != null) {
+      final bytes = await fotoBukti.file.readAsBytes();
+      final uploadFile = ApiUploadFile.fromBytes(
+        fieldName: 'foto_bukti',
+        bytes: bytes,
+        filename: fotoBukti.name,
+      );
+
+      final res = await _api.multipart(
+        _buildPengajuanUrl(idPengajuan),
+        method: 'PATCH',
+        fields: payload,
+        files: [uploadFile],
+        useToken: true,
+      );
+
+      return _parseSingle(res);
+    }
+
+    final res = await _api.patch(
+      _buildPengajuanUrl(idPengajuan),
+      useToken: true,
+      body: payload,
+    );
+
+    return _parseSingle(res);
+  }
+
   Future<PengajuanData> deletePengajuan(String idPengajuan) async {
     final res = await _api.delete(
       _buildPengajuanUrl(idPengajuan),
