@@ -35,4 +35,7 @@ class Endpoints {
 
   //absensi-history
   static const String absensiHistory = "$baseURL/absensi";
+
+  //pengajuan-absensi
+  static const String pengajuanAbsensiS = "$baseURL/pengajuan-absensi";
 }
