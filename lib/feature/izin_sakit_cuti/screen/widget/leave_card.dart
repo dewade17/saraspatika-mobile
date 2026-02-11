@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'leave_models.dart';
+import 'package:saraspatika/feature/izin_sakit_cuti/data/dto/pengajuan_absensi.dart';
 import 'leave_status_badge.dart';
 
 class LeaveCard extends StatelessWidget {
-  final LeaveRequestUiModel leave;
+  final PengajuanData leave;
   final String tanggalMulaiLabel;
   final String tanggalSelesaiLabel;
-  final String buktiLabel;
+
   final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -16,7 +16,6 @@ class LeaveCard extends StatelessWidget {
     required this.leave,
     required this.tanggalMulaiLabel,
     required this.tanggalSelesaiLabel,
-    required this.buktiLabel,
     required this.onTap,
     required this.onEdit,
     required this.onDelete,
@@ -24,7 +23,7 @@ class LeaveCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isPending = leave.status == null || leave.status == 'PENDING';
+    final isPending = leave.status == 'PENDING';
 
     return InkWell(
       onTap: onTap,
@@ -43,7 +42,7 @@ class LeaveCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      leave.jenisIzin.toUpperCase(),
+                      leave.jenisPengajuan.toUpperCase(),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -138,7 +137,7 @@ class LeaveCard extends StatelessWidget {
                   const Icon(Icons.attachment, size: 16, color: Colors.grey),
                   const SizedBox(width: 8),
                   Text(
-                    'Bukti: $buktiLabel',
+                    'Bukti: ${leave.buktiLabel}',
                     style: const TextStyle(fontSize: 13, color: Colors.black54),
                   ),
                 ],

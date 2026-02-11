@@ -5,6 +5,7 @@ import 'package:saraspatika/feature/absensi/data/provider/offline_provider.dart'
 import 'package:saraspatika/feature/absensi/screen/absensi_kepulangan/absensi_kepulangan_screen.dart';
 import 'package:saraspatika/feature/home/data/provider/history_kehadiran_provider.dart';
 import 'package:saraspatika/feature/home/screen/view_all/view_all_history.dart';
+import 'package:saraspatika/feature/izin_sakit_cuti/data/provider/pengajuan_absensi_provider.dart';
 import 'package:saraspatika/feature/registrasi_wajah/data/provider/enroll_face_provider.dart';
 import 'package:saraspatika/feature/absensi/data/provider/get_face_provider.dart';
 import 'package:saraspatika/feature/absensi/screen/absensi_kedatangan/absensi_kedatangan_screen.dart';
@@ -63,6 +64,9 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<HistoryKehadiranProvider>(
           create: (_) => HistoryKehadiranProvider(),
+        ),
+        ChangeNotifierProvider<PengajuanAbsensiProvider>(
+          create: (_) => PengajuanAbsensiProvider(),
         ),
       ],
       child: MaterialApp(

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:saraspatika/core/constants/colors.dart';
+import 'package:saraspatika/feature/izin_sakit_cuti/data/dto/pengajuan_absensi.dart';
 import 'package:saraspatika/feature/izin_sakit_cuti/data/provider/pengajuan_absensi_provider.dart';
 import 'package:saraspatika/feature/izin_sakit_cuti/screen/form_tambah_pengajuan/pengajuan_screen.dart';
 import 'widget/leave_card.dart';
 import 'widget/leave_detail_sheet.dart';
 import 'widget/leave_empty_state.dart';
-import 'widget/leave_models.dart';
 
 class IzinSakitCuti extends StatefulWidget {
   const IzinSakitCuti({super.key});
@@ -46,7 +46,7 @@ class _IzinSakitCutiState extends State<IzinSakitCuti> {
     }
   }
 
-  Future<void> _confirmDelete(LeaveRequestUiModel leave) async {
+  Future<void> _confirmDelete(PengajuanData leave) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -70,7 +70,7 @@ class _IzinSakitCutiState extends State<IzinSakitCuti> {
     final provider = context.read<PengajuanAbsensiProvider>();
 
     try {
-      await provider.deletePengajuan(leave.leaveId);
+      await provider.deletePengajuan(leave.idPengajuan);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Pengajuan berhasil dihapus.')),
@@ -84,9 +84,9 @@ class _IzinSakitCutiState extends State<IzinSakitCuti> {
     }
   }
 
-  void _onEdit(LeaveRequestUiModel leave) {
+  void _onEdit(PengajuanData leave) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Edit ${leave.jenisIzin} belum tersedia.')),
+      SnackBar(content: Text('Edit ${leave.jenisPengajuan} belum tersedia.')),
     );
   }
 
@@ -94,9 +94,7 @@ class _IzinSakitCutiState extends State<IzinSakitCuti> {
   Widget build(BuildContext context) {
     return Consumer<PengajuanAbsensiProvider>(
       builder: (context, provider, _) {
-        final requests = provider.items
-            .map(LeaveRequestUiModel.fromPengajuan)
-            .toList();
+        final requests = provider.items;
 
         return Scaffold(
           appBar: AppBar(
@@ -126,7 +124,6 @@ class _IzinSakitCutiState extends State<IzinSakitCuti> {
                               tanggalSelesaiLabel: _formatDateOnly(
                                 leave.tanggalSelesai,
                               ),
-                              buktiLabel: _buktiLabel(leave.bukti),
                               onTap: () => showLeaveDetailBottomSheet(
                                 context: context,
                                 leave: leave,
@@ -167,16 +164,5 @@ class _IzinSakitCutiState extends State<IzinSakitCuti> {
     final m = d.month.toString().padLeft(2, '0');
     final day = d.day.toString().padLeft(2, '0');
     return '$y-$m-$day';
-  }
-
-  static String _buktiLabel(BuktiKind kind) {
-    switch (kind) {
-      case BuktiKind.image:
-        return 'Gambar';
-      case BuktiKind.pdf:
-        return 'PDF';
-      case BuktiKind.none:
-        return 'Tidak ada';
-    }
   }
 }

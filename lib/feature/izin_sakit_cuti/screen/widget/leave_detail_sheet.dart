@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'leave_models.dart';
+import 'package:saraspatika/feature/izin_sakit_cuti/data/dto/pengajuan_absensi.dart';
 
 void showLeaveDetailBottomSheet({
   required BuildContext context,
-  required LeaveRequestUiModel leave,
+  required PengajuanData leave,
   required String Function(DateTime) formatDateOnly,
 }) {
   showModalBottomSheet(
@@ -53,7 +53,7 @@ void showLeaveDetailBottomSheet({
                 _detailRow(
                   icon: Icons.assignment,
                   label: 'Jenis Izin',
-                  value: leave.jenisIzin,
+                  value: leave.jenisPengajuan,
                 ),
                 const SizedBox(height: 8),
                 _detailRow(
@@ -77,7 +77,7 @@ void showLeaveDetailBottomSheet({
                 _detailRow(
                   icon: Icons.verified_user,
                   label: 'Status',
-                  value: leave.status ?? 'Pending',
+                  value: leave.status,
                 ),
                 const Divider(height: 32),
                 const Text(
@@ -85,7 +85,7 @@ void showLeaveDetailBottomSheet({
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
-                if (leave.bukti == BuktiKind.image)
+                if (leave.buktiKind == BuktiKind.image)
                   Container(
                     height: 180,
                     decoration: BoxDecoration(
@@ -104,7 +104,7 @@ void showLeaveDetailBottomSheet({
                       ),
                     ),
                   )
-                else if (leave.bukti == BuktiKind.pdf)
+                else if (leave.buktiKind == BuktiKind.pdf)
                   Card(
                     color: Colors.red[50],
                     child: ListTile(

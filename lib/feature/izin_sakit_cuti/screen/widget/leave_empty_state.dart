@@ -15,7 +15,7 @@ class LeaveEmptyState extends StatelessWidget {
             child: Opacity(
               opacity: 0.5,
               child: Image.asset(
-                'assets/images/Empty-data.png',
+                'lib/assets/images/Empty-data.png',
                 fit: BoxFit.cover,
               ),
             ),

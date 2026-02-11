@@ -44,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
           key: _bottomNavigationKey,
           items: const [
             Icon(Icons.home, color: AppColors.backgroundColor),
-            Icon(Icons.notifications, color: AppColors.backgroundColor),
+            Icon(Icons.article_outlined, color: AppColors.backgroundColor),
             Icon(Icons.person, color: AppColors.backgroundColor),
           ],
           onTap: (index) {
