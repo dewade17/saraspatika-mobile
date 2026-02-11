@@ -55,7 +55,7 @@ class PengajuanData {
   BuktiKind get buktiKind {
     final buktiUrl = fotoBuktiUrl.trim().toLowerCase();
     if (buktiUrl.isEmpty) return BuktiKind.none;
-    if (buktiUrl.endsWith('.pdf')) return BuktiKind.pdf;
+    if (buktiUrl.contains('.pdf')) return BuktiKind.pdf;
     return BuktiKind.image;
   }
 

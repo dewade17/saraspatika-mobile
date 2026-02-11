@@ -23,7 +23,7 @@ class LeaveCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isPending = leave.status == 'PENDING';
+    final isPending = leave.status == 'MENUNGGU';
 
     return InkWell(
       onTap: onTap,

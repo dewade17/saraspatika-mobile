@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:saraspatika/feature/izin_sakit_cuti/data/dto/pengajuan_absensi.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void showLeaveDetailBottomSheet({
   required BuildContext context,
@@ -36,12 +37,12 @@ void showLeaveDetailBottomSheet({
                   ),
                 ),
                 Row(
-                  children: const [
-                    Icon(Icons.description, color: Colors.indigo),
-                    SizedBox(width: 8),
+                  children: [
+                    const Icon(Icons.description, color: Colors.indigo),
+                    const SizedBox(width: 8),
                     Text(
-                      'Detail Izin',
-                      style: TextStyle(
+                      leave.jenisPengajuan,
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Colors.indigo,
@@ -84,45 +85,95 @@ void showLeaveDetailBottomSheet({
                   'Bukti Pengajuan:',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-                  const SizedBox(height: 12),
-                  if (leave.buktiKind == BuktiKind.image)
-                    Container(
+                const SizedBox(height: 12),
+                if (leave.buktiKind == BuktiKind.image)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      leave.fotoBuktiUrl,
                       height: 180,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.black12),
-                        color: Colors.grey[50],
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) {
+                          return child;
+                        }
+
+                        return SizedBox(
+                          height: 180,
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                  : null,
+                            ),
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          height: 180,
+                          width: double.infinity,
+                          color: Colors.grey[100],
+                          alignment: Alignment.center,
+                          child: const Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.broken_image_outlined, size: 40),
+                              SizedBox(height: 8),
+                              Text('Gagal memuat gambar bukti'),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  )
+                else if (leave.buktiKind == BuktiKind.pdf)
+                  Card(
+                    color: Colors.red[50],
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.picture_as_pdf,
+                        color: Colors.red,
                       ),
-                      child: const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.image_outlined, size: 40),
-                            SizedBox(height: 8),
-                            Text('Preview Gambar (UI dummy)'),
-                          ],
-                        ),
-                      ),
-                    )
-                  else if (leave.buktiKind == BuktiKind.pdf)
-                    Card(
-                      color: Colors.red[50],
-                      child: ListTile(
-                        leading: const Icon(
-                          Icons.picture_as_pdf,
-                          color: Colors.red,
-                        ),
-                        title: const Text('Bukti PDF'),
-                        subtitle: const Text('Klik untuk melihat (UI dummy)'),
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Open PDF (UI dummy)')),
-                          );
-                        },
-                      ),
-                    )
-                  else
-                    const Text('Tidak ada bukti yang diunggah'),
+                      title: const Text('Bukti PDF'),
+                      subtitle: const Text('Klik untuk melihat file PDF'),
+                      onTap: () async {
+                        final pdfUri = Uri.tryParse(leave.fotoBuktiUrl);
+
+                        if (pdfUri == null) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Link PDF tidak valid'),
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
+                        final canOpenPdf = await canLaunchUrl(pdfUri);
+                        if (!canOpenPdf) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Tidak bisa membuka file PDF'),
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
+                        await launchUrl(
+                          pdfUri,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      },
+                    ),
+                  )
+                else
+                  const Text('Tidak ada bukti yang diunggah'),
               ],
             ),
           );
