@@ -24,9 +24,7 @@ class _ButtonAppBarState extends State<ButtonAppBar> {
         ? Icons.business_center
         : Icons.assignment_add;
     final String menuTitle = isKerja ? 'Agenda\nKerja' : 'Agenda\nMengajar';
-    final String routeName = isKerja
-        ? '/screen-agenda-kerja'
-        : '/screen-agenda-mengajar';
+    const String routeName = '/screen-agenda';
     final bool isProfileComplete = user?.isProfileComplete ?? false;
 
     return Column(
@@ -106,8 +104,14 @@ class _ButtonAppBarState extends State<ButtonAppBar> {
                             action: 'read',
                             child: Expanded(
                               child: InkWell(
-                                onTap: () =>
-                                    Navigator.pushNamed(context, routeName),
+                                onTap: () => Navigator.pushNamed(
+                                  context,
+                                  routeName,
+                                  arguments: {
+                                    'title': menuTitle.replaceAll('\n', ' '),
+                                    'role': userRole,
+                                  },
+                                ),
                                 child: Column(
                                   children: [
                                     Icon(
@@ -168,7 +172,7 @@ class _ButtonAppBarState extends State<ButtonAppBar> {
               : Center(
                   child: Column(
                     children: [
-                      SizedBox(height: 10),
+                      const SizedBox(height: 10),
                       InkWell(
                         onTap: () async {
                           await authProvider.logout();
@@ -196,7 +200,7 @@ class _ButtonAppBarState extends State<ButtonAppBar> {
                           ],
                         ),
                       ),
-                      Padding(
+                      const Padding(
                         padding: EdgeInsets.all(13),
                         child: Text(
                           "Silakan lengkapi profil untuk mengakses menu.",

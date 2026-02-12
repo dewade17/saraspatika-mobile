@@ -10,6 +10,7 @@ class AppTextField extends StatefulWidget {
     this.focusNode,
     this.label,
     this.hintText,
+    this.alignLabelWithHint = false,
     this.helperText,
     this.leadingIcon,
     this.leading,
@@ -70,6 +71,9 @@ class AppTextField extends StatefulWidget {
 
   final String? label;
   final String? hintText;
+
+  final bool alignLabelWithHint;
+
   final String? helperText;
 
   final IconData? leadingIcon;
@@ -377,6 +381,7 @@ class _AppTextFieldState extends State<AppTextField> {
                       labelText: widget.label,
                       hintText: widget.hintText,
                       hintStyle: widget.hintStyle,
+                      alignLabelWithHint: widget.alignLabelWithHint,
                       prefixIcon:
                           widget.leading ??
                           (widget.leadingIcon != null
