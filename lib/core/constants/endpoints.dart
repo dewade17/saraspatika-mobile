@@ -38,4 +38,7 @@ class Endpoints {
 
   //pengajuan-absensi
   static const String pengajuanAbsensiS = "$baseURL/pengajuan-absensi";
+
+  //agenda
+  static const String agenda = "$baseURL/agenda";
 }
