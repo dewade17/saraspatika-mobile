@@ -10,8 +10,8 @@ class AgendaResponse {
       AgendaResponse.fromJson(json.decode(str));
 
   factory AgendaResponse.fromJson(Map<String, dynamic> json) => AgendaResponse(
-    data: List<Agenda>.from(json["data"].map((x) => Agenda.fromJson(x))),
-    message: json["message"],
+    data: List<Agenda>.from(json['data'].map((x) => Agenda.fromJson(x))),
+    message: json['message'],
   );
 }
 
@@ -41,28 +41,61 @@ class Agenda {
   });
 
   factory Agenda.fromJson(Map<String, dynamic> json) => Agenda(
-    idAgenda: json["id_agenda"],
-    idUser: json["id_user"],
-    deskripsi: json["deskripsi"],
-    kategoriAgenda: json["kategori_agenda"],
-    tanggal: DateTime.parse(json["tanggal"]),
-    jamMulai: DateTime.parse(json["jam_mulai"]),
-    jamSelesai: DateTime.parse(json["jam_selesai"]),
-    buktiPendukungUrl: json["bukti_pendukung_url"],
-    createdAt: DateTime.parse(json["created_at"]),
-    updatedAt: DateTime.parse(json["updated_at"]),
+    idAgenda: json['id_agenda'],
+    idUser: json['id_user'],
+    deskripsi: json['deskripsi'],
+    kategoriAgenda: json['kategori_agenda'],
+    tanggal: DateTime.parse(json['tanggal']),
+    jamMulai: DateTime.parse(json['jam_mulai']),
+    jamSelesai: DateTime.parse(json['jam_selesai']),
+    buktiPendukungUrl: json['bukti_pendukung_url'],
+    createdAt: DateTime.parse(json['created_at']),
+    updatedAt: DateTime.parse(json['updated_at']),
   );
 
   Map<String, dynamic> toJson() => {
-    "id_agenda": idAgenda,
-    "id_user": idUser,
-    "deskripsi": deskripsi,
-    "kategori_agenda": kategoriAgenda,
-    "tanggal": tanggal.toIso8601String(),
-    "jam_mulai": jamMulai.toIso8601String(),
-    "jam_selesai": jamSelesai.toIso8601String(),
-    "bukti_pendukung_url": buktiPendukungUrl,
-    "created_at": createdAt.toIso8601String(),
-    "updated_at": updatedAt.toIso8601String(),
+    'id_agenda': idAgenda,
+    'id_user': idUser,
+    'deskripsi': deskripsi,
+    'kategori_agenda': kategoriAgenda,
+    'tanggal': tanggal.toIso8601String(),
+    'jam_mulai': jamMulai.toIso8601String(),
+    'jam_selesai': jamSelesai.toIso8601String(),
+    'bukti_pendukung_url': buktiPendukungUrl,
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
   };
+}
+
+enum AgendaBuktiKind { none, image, pdf, unknown }
+
+AgendaBuktiKind agendaBuktiKindFromUrl(String? buktiPendukungUrl) {
+  final raw = buktiPendukungUrl?.trim();
+  if (raw == null || raw.isEmpty) return AgendaBuktiKind.none;
+
+  final lowered = raw.toLowerCase();
+
+  bool hasExtension(String ext) {
+    if (lowered.endsWith(ext)) return true;
+
+    final uri = Uri.tryParse(raw);
+    if (uri != null && uri.path.toLowerCase().endsWith(ext)) return true;
+
+    return false;
+  }
+
+  if (hasExtension('.pdf')) return AgendaBuktiKind.pdf;
+
+  if (hasExtension('.jpg') ||
+      hasExtension('.jpeg') ||
+      hasExtension('.png') ||
+      hasExtension('.webp') ||
+      hasExtension('.gif') ||
+      hasExtension('.bmp') ||
+      hasExtension('.heic') ||
+      hasExtension('.heif')) {
+    return AgendaBuktiKind.image;
+  }
+
+  return AgendaBuktiKind.unknown;
 }

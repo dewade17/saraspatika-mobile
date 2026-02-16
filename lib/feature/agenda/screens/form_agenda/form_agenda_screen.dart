@@ -3,11 +3,16 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:saraspatika/core/constants/colors.dart';
 import 'package:saraspatika/core/shared_widgets/app_button_widget.dart';
+import 'package:saraspatika/core/shared_widgets/app_picked_file.dart';
 import 'package:saraspatika/core/shared_widgets/app_text_field.dart';
+import 'package:saraspatika/core/utils/image_compress_utils.dart';
+import 'package:saraspatika/feature/agenda/data/provider/agenda_provider.dart';
+import 'package:saraspatika/feature/login/data/provider/auth_provider.dart';
+import 'package:file_picker/file_picker.dart';
 
 class FormAgendaScreen extends StatefulWidget {
   const FormAgendaScreen({super.key});
@@ -28,8 +33,7 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
   TimeOfDay? _jamMulai;
   TimeOfDay? _jamSelesai;
 
-  File? galleryFile;
-  final ImagePicker picker = ImagePicker();
+  AppPickedFile? _pickedFile;
 
   @override
   void dispose() {
@@ -40,56 +44,72 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
     super.dispose();
   }
 
-  void _showPicker(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Wrap(
-          children: <Widget>[
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Photo Library'),
-              onTap: () {
-                _getImage(ImageSource.gallery);
-                Navigator.of(context).pop();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_camera),
-              title: const Text('Camera'),
-              onTap: () {
-                _getImage(ImageSource.camera);
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        ),
-      ),
+  Future<void> _pickBukti() async {
+    final source = await AppFilePicker.showSourceChooser(
+      context,
+      allowCamera: true,
+      allowGallery: true,
+      allowFileSystem: true,
+      dialogTitle: 'Pilih Sumber Bukti',
     );
-  }
 
-  Future<void> _getImage(ImageSource source) async {
-    final pickedFile = await picker.pickImage(source: source);
-    if (pickedFile == null) return;
+    if (source == null) return;
 
-    final file = File(pickedFile.path);
-    final bytes = await file.length();
-    const maxSizeInBytes = 1 * 1024 * 1024; // 1MB
+    List<AppPickedFile> picked = [];
 
-    if (bytes > maxSizeInBytes) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ukuran file melebihi 1MB. Silakan pilih file lain.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
+    try {
+      switch (source) {
+        case AppFileSource.camera:
+          picked = await AppFilePicker.pickFromCamera(
+            context: context,
+            compressCameraImage: true,
+            cameraCompressOptions: const ImageCompressOptions(
+              targetBytes: 2 * 1024 * 1024,
+            ),
+          );
+          break;
+        case AppFileSource.gallery:
+          picked = await AppFilePicker.pickFromGallery(
+            context: context,
+            mode: AppFilePickerMode.imagesOnly,
+            allowMultiple: false,
+          );
+          break;
+        case AppFileSource.fileSystem:
+          picked = await AppFilePicker.pickFromFileSystem(
+            context: context,
+            mode: AppFilePickerMode.any,
+            fileType: FileType.any,
+            allowMultiple: false,
+          );
+          break;
+      }
+
+      if (picked.isNotEmpty) {
+        final file = picked.first;
+        final bytes = await file.file.length();
+        const maxSizeInBytes = 2 * 1024 * 1024;
+
+        if (bytes > maxSizeInBytes) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Ukuran file melebihi 2MB. Silakan pilih file lain.',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        setState(() {
+          _pickedFile = file;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking file: $e');
     }
-
-    setState(() {
-      galleryFile = file;
-    });
   }
 
   Future<void> _selectDate() async {
@@ -112,8 +132,7 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
       },
     );
 
-    if (picked == null) return;
-    if (!mounted) return;
+    if (picked == null || !mounted) return;
 
     final formatter = DateFormat('yyyy-MM-dd');
     setState(() {
@@ -128,16 +147,18 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
       initialTime: TimeOfDay.now(),
     );
 
-    if (picked == null) return;
-    if (!mounted) return;
+    if (picked == null || !mounted) return;
+
+    final normalized =
+        '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
 
     setState(() {
       if (isStart) {
         _jamMulai = picked;
-        _jamMulaiController.text = picked.format(context);
+        _jamMulaiController.text = normalized;
       } else {
         _jamSelesai = picked;
-        _jamSelesaiController.text = picked.format(context);
+        _jamSelesaiController.text = normalized;
       }
     });
   }
@@ -149,10 +170,10 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
         _tanggal == null ||
         _jamMulai == null ||
         _jamSelesai == null ||
-        galleryFile == null) {
+        _pickedFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Mohon lengkapi semua field dan pilih foto.'),
+          content: Text('Mohon lengkapi semua field dan pilih bukti.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -175,36 +196,53 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
       _jamSelesai!.minute,
     );
 
-    if (endDateTime.isBefore(startDateTime)) {
+    if (!endDateTime.isAfter(startDateTime)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Jam selesai tidak boleh lebih awal dari jam mulai.'),
+          content: Text('Jam selesai harus lebih besar dari jam mulai.'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    // UI only: tidak kirim ke backend
-    print('UI Only Submit:');
-    print('Deskripsi: ${_deskripsiController.text}');
-    print('Tanggal: ${_tanggalController.text}');
-    print('Mulai: ${_jamMulaiController.text}');
-    print('Selesai: ${_jamSelesaiController.text}');
-    print('Foto: ${galleryFile!.path}');
+    final provider = context.read<AgendaProvider>();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Validasi sukses (UI only). Data siap disimpan.'),
-      ),
-    );
+    try {
+      await provider.createAgenda(
+        deskripsi: _deskripsiController.text,
+        tanggal: _tanggalController.text,
+        jamMulai: _jamMulaiController.text,
+        jamSelesai: _jamSelesaiController.text,
+        buktiPendukung: _pickedFile,
+      );
 
-    // Kalau mau auto close setelah submit UI-only:
-    // Navigator.pop(context);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Agenda berhasil disimpan.')),
+      );
+      Navigator.pop(context, true);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(provider.errorMessage ?? 'Gagal menyimpan agenda.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = context.select<AgendaProvider, bool>(
+      (provider) => provider.isLoading,
+    );
+    final user = context.watch<AuthProvider>().me;
+    final String labelSuffix = user?.role.toUpperCase() == 'GURU'
+        ? 'Mengajar'
+        : 'Kerja';
+
     return Scaffold(
       appBar: AppBar(backgroundColor: AppColors.primaryColor),
       body: Stack(
@@ -216,24 +254,18 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
           ),
           SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 24.0,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
               child: Column(
                 children: [
                   const SizedBox(height: 120),
-
-                  // Title + Form dijadikan satu block dan dipindah naik
-                  // agar terlihat berada di area header, tapi tetap ikut scroll.
                   Transform.translate(
                     offset: const Offset(0, -90),
                     child: Column(
                       children: [
-                        const Center(
+                        Center(
                           child: Text(
-                            "Form Agenda Mengajar",
-                            style: TextStyle(
+                            'Form Agenda $labelSuffix',
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
@@ -262,7 +294,7 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
                               children: [
                                 AppTextField(
                                   controller: _deskripsiController,
-                                  label: 'Deskripsi Mengajar',
+                                  label: 'Deskripsi $labelSuffix',
                                   alignLabelWithHint: true,
                                   leadingIcon: Icons.work,
                                   minLines: 3,
@@ -299,35 +331,40 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
                                 ),
                                 const SizedBox(height: 20),
                                 AppButton(
-                                  onPressed: () => _showPicker(context),
+                                  onPressed: isLoading ? null : _pickBukti,
                                   variant: AppButtonVariant.outline,
                                   fullWidth: true,
                                   size: AppButtonSize.lg,
                                   leading: const Icon(Icons.upload_file),
-                                  text: 'Upload Bukti Foto',
+                                  text: _pickedFile != null
+                                      ? 'Ubah Bukti'
+                                      : 'Upload Bukti Foto/File',
                                   borderRadius: 12,
                                 ),
-                                if (galleryFile != null)
+                                if (_pickedFile != null)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 12),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.file(
-                                        galleryFile!,
-                                        height: 160,
-                                        width: double.infinity,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
+                                    child: _buildFilePreview(),
                                   ),
                                 const SizedBox(height: 32),
                                 AppButton(
-                                  onPressed: _submitForm,
+                                  onPressed: isLoading ? null : _submitForm,
                                   variant: AppButtonVariant.primary,
                                   fullWidth: true,
                                   size: AppButtonSize.lg,
-                                  leading: const Icon(Icons.save),
-                                  text: 'Simpan Agenda',
+                                  leading: isLoading
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(Icons.save),
+                                  text: isLoading
+                                      ? 'Menyimpan...'
+                                      : 'Simpan Agenda',
                                   borderRadius: 12,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 20,
@@ -342,8 +379,6 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
                       ],
                     ),
                   ),
-
-                  // Space bawah biar enak scroll sampai akhir
                   const SizedBox(height: 40),
                 ],
               ),
@@ -353,5 +388,60 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
       ),
     );
   }
+
+  Widget _buildFilePreview() {
+    final fileName = _pickedFile!.path.split('/').last;
+    final isImage = [
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.webp',
+      '.heic',
+    ].any((ext) => fileName.toLowerCase().endsWith(ext));
+
+    if (isImage) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.file(
+          _pickedFile!.file,
+          height: 160,
+          width: double.infinity,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            fileName.toLowerCase().endsWith('.pdf')
+                ? Icons.picture_as_pdf
+                : Icons.insert_drive_file,
+            color: fileName.toLowerCase().endsWith('.pdf')
+                ? Colors.red
+                : Colors.blue,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              fileName,
+              style: const TextStyle(fontSize: 14),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.red),
+            onPressed: () => setState(() => _pickedFile = null),
+          ),
+        ],
+      ),
+    );
+  }
 }
-  

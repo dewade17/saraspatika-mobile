@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:saraspatika/feature/agenda/screens/agenda_ui_data.dart';
+import 'package:saraspatika/feature/agenda/data/dto/agenda.dart';
 
 class AgendaListItemCard extends StatelessWidget {
   const AgendaListItemCard({
@@ -9,7 +9,7 @@ class AgendaListItemCard extends StatelessWidget {
     required this.onTap,
   });
 
-  final AgendaUiData agenda;
+  final Agenda agenda;
   final VoidCallback onTap;
 
   @override

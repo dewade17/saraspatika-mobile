@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 class AttendanceResponse {
   final List<AttendanceData> data;
 
@@ -55,10 +53,8 @@ class AttendanceData {
     statusMasuk: json["status_masuk"] ?? "",
     statusPulang: json["status_pulang"] ?? "",
     user: UserAttendanceInfo.fromJson(json["user"]),
-    checkIn: json["in"] == null ? null : AttendancePoint.fromJson(json["in"]),
-    checkOut: json["out"] == null
-        ? null
-        : AttendancePoint.fromJson(json["out"]),
+    checkIn: AttendancePoint.tryFromJson(json["in"]),
+    checkOut: AttendancePoint.tryFromJson(json["out"]),
   );
 
   Map<String, dynamic> toJson() => {
@@ -119,6 +115,24 @@ class AttendancePoint {
     required this.longitude,
     required this.lokasi,
   });
+
+  static AttendancePoint? tryFromJson(dynamic raw) {
+    if (raw is! Map) return null;
+    final map = Map<String, dynamic>.from(raw);
+
+    final latitude = (map["latitude"] as num?)?.toDouble();
+    final longitude = (map["longitude"] as num?)?.toDouble();
+    final lokasiRaw = map["lokasi"];
+    if (latitude == null || longitude == null || lokasiRaw is! Map) {
+      return null;
+    }
+
+    return AttendancePoint(
+      latitude: latitude,
+      longitude: longitude,
+      lokasi: LocationDetail.fromJson(Map<String, dynamic>.from(lokasiRaw)),
+    );
+  }
 
   factory AttendancePoint.fromJson(Map<String, dynamic> json) =>
       AttendancePoint(

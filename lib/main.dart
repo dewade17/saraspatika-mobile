@@ -3,6 +3,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:saraspatika/feature/absensi/data/provider/offline_provider.dart';
 import 'package:saraspatika/feature/absensi/screen/absensi_kepulangan/absensi_kepulangan_screen.dart';
+import 'package:saraspatika/feature/agenda/data/provider/agenda_provider.dart';
 import 'package:saraspatika/feature/agenda/screens/agenda_home_screen.dart';
 import 'package:saraspatika/feature/home/data/provider/history_kehadiran_provider.dart';
 import 'package:saraspatika/feature/home/screen/view_all/view_all_history.dart';
@@ -69,6 +70,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<PengajuanAbsensiProvider>(
           create: (_) => PengajuanAbsensiProvider(),
         ),
+        ChangeNotifierProvider<AgendaProvider>(create: (_) => AgendaProvider()),
       ],
       child: MaterialApp(
         title: 'Saraspatika',

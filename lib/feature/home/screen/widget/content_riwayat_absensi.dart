@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart'; // Tambahkan import provider
-import 'package:saraspatika/feature/home/data/provider/history_kehadiran_provider.dart'; // Import provider Anda
+import 'package:provider/provider.dart';
+import 'package:saraspatika/feature/home/data/provider/history_kehadiran_provider.dart';
+import 'package:saraspatika/feature/home/data/dto/history_kehadiran.dart';
 
 class ContentRiwayatAbsensi extends StatefulWidget {
   const ContentRiwayatAbsensi({super.key});
@@ -11,36 +12,27 @@ class ContentRiwayatAbsensi extends StatefulWidget {
 }
 
 class _ContentRiwayatAbsensiState extends State<ContentRiwayatAbsensi> {
-  late final DateTime now;
-  late final String tanggalFormatted;
-
   @override
   void initState() {
     super.initState();
-    now = DateTime.now();
-    tanggalFormatted = DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(now);
-
-    // Memicu pengambilan data saat widget dimuat
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<HistoryKehadiranProvider>().fetchMyHistory(limit: 1);
+      context.read<HistoryKehadiranProvider>().fetchMyHistory(limit: 7);
     });
   }
 
-  // Fungsi helper untuk memformat waktu dari DateTime
   String formatTime(DateTime? dateTime) {
     if (dateTime == null) return "--:--";
     return DateFormat('HH:mm').format(dateTime);
   }
 
+  String formatDate(DateTime date) {
+    return DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(date);
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Mendengarkan perubahan data pada provider
     final historyProvider = context.watch<HistoryKehadiranProvider>();
-
-    // Mengambil data terbaru jika tersedia
-    final latestAttendance = historyProvider.history.isNotEmpty
-        ? historyProvider.history.first
-        : null;
+    final listHistory = historyProvider.history;
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -62,92 +54,75 @@ class _ContentRiwayatAbsensiState extends State<ContentRiwayatAbsensi> {
           ],
         ),
         const SizedBox(height: 16),
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+        if (historyProvider.isLoading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (listHistory.isEmpty)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Text("Belum ada data absensi"),
+            ),
+          )
+        else
+          Column(
+            children: listHistory
+                .map((item) => _buildAttendanceCard(item))
+                .toList(),
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      ],
+    );
+  }
+
+  Widget _buildAttendanceCard(AttendanceData item) {
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              formatDate(item.tanggal),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 15),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                Text(
-                  tanggalFormatted,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 15),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          color: Colors.red,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Jam Masuk",
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            Text(
-                              // Data dinamis dari provider
-                              formatTime(latestAttendance?.waktuMasuk),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          color: Colors.red,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Jam Pulang",
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            Text(
-                              // Data dinamis dari provider
-                              formatTime(latestAttendance?.waktuPulang),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                _buildTimeColumn("Jam Masuk", item.waktuMasuk, Colors.green),
+                _buildTimeColumn("Jam Pulang", item.waktuPulang, Colors.red),
               ],
             ),
-          ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimeColumn(String label, DateTime? time, Color color) {
+    return Row(
+      children: [
+        Icon(Icons.location_on, color: color, size: 24),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            Text(
+              formatTime(time),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+          ],
         ),
       ],
     );

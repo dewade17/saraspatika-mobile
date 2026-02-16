@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:saraspatika/feature/agenda/screens/agenda_ui_data.dart';
+import 'package:saraspatika/feature/agenda/data/dto/agenda.dart';
 import 'package:saraspatika/feature/agenda/screens/widget/agenda_action_buttons.dart';
 import 'package:saraspatika/feature/agenda/screens/widget/agenda_bukti_preview.dart';
 import 'package:saraspatika/feature/agenda/screens/widget/agenda_info_row.dart';
@@ -8,12 +8,9 @@ import 'package:saraspatika/feature/agenda/screens/widget/agenda_info_row.dart';
 class AgendaDetailBottomSheet extends StatelessWidget {
   const AgendaDetailBottomSheet({super.key, required this.agenda});
 
-  final AgendaUiData agenda;
+  final Agenda agenda;
 
-  static void show({
-    required BuildContext context,
-    required AgendaUiData agenda,
-  }) {
+  static void show({required BuildContext context, required Agenda agenda}) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -59,7 +56,6 @@ class AgendaDetailBottomSheet extends StatelessWidget {
                 ],
               ),
               const Divider(height: 24),
-
               AgendaInfoRow(
                 icon: Icons.date_range,
                 iconColor: Colors.indigo,
@@ -70,7 +66,6 @@ class AgendaDetailBottomSheet extends StatelessWidget {
                 ).format(agenda.tanggal.toLocal()),
               ),
               const SizedBox(height: 8),
-
               AgendaInfoRow(
                 icon: Icons.access_time,
                 iconColor: Colors.indigo,
@@ -81,7 +76,6 @@ class AgendaDetailBottomSheet extends StatelessWidget {
                 ).format(agenda.jamMulai.toLocal()),
               ),
               const SizedBox(height: 8),
-
               AgendaInfoRow(
                 icon: Icons.access_time_filled,
                 iconColor: Colors.indigo,
@@ -92,7 +86,6 @@ class AgendaDetailBottomSheet extends StatelessWidget {
                 ).format(agenda.jamSelesai.toLocal()),
               ),
               const SizedBox(height: 8),
-
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -111,46 +104,25 @@ class AgendaDetailBottomSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    agenda.deskripsiPekerjaan,
+                    agenda.deskripsi,
                     style: const TextStyle(fontSize: 14, color: Colors.black87),
                   ),
                 ],
               ),
-
               const SizedBox(height: 24),
               const Text(
                 'Bukti Pekerjaan:',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 12),
-
-              AgendaBuktiPreview(
-                buktiKind: agenda.buktiKind,
-                onTapPdf: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('UI Only: buka/unduh PDF (dummy)'),
-                    ),
-                  );
-                },
-              ),
-
+              AgendaBuktiPreview(buktiPendukungUrl: agenda.buktiPendukungUrl),
               const SizedBox(height: 24),
-
               AgendaActionButtons(
                 onEdit: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('UI Only: tombol Edit ditekan'),
-                    ),
-                  );
+                  Navigator.pop(context);
                 },
                 onDelete: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('UI Only: tombol Hapus ditekan'),
-                    ),
-                  );
+                  Navigator.pop(context);
                 },
               ),
             ],
