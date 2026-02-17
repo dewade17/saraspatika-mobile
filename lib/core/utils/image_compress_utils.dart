@@ -132,8 +132,6 @@ class ImageCompressUtils {
         return '.webp';
       case CompressFormat.heic:
         return '.heic';
-      default:
-        return '.jpg';
     }
   }
 }

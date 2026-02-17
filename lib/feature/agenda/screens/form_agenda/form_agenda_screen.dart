@@ -1,3 +1,5 @@
+// ignore_for_file: unused_import, use_build_context_synchronously, deprecated_member_use
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';

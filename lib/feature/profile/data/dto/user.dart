@@ -1,3 +1,5 @@
+// ignore_for_file: unused_import
+
 import 'dart:convert';
 
 /// Kelas pembungkus untuk menangasni respon utama yang berisi list data

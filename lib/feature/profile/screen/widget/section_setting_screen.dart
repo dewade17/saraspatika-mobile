@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:saraspatika/feature/absensi/screen/face_detection/face_detection_screen.dart';
-import 'package:saraspatika/feature/registrasi_wajah/screen/registrasi_wajah.dart';
 import 'package:saraspatika/feature/request_wajah/screen/home_request_wajah.dart';
 
 class SectionSettingScreen extends StatefulWidget {

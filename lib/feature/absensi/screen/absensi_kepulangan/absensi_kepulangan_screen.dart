@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -618,7 +620,7 @@ class _InfoCard extends StatelessWidget {
                   : Text(
                       jadwalShift == null
                           ? 'Jadwal shift hari ini tidak tersedia.'
-                          : 'Shift Mengajar: ${jadwalShift?.jamMulaiKerja != null ? DateFormat('HH:mm').format(jadwalShift!.jamMulaiKerja!) : "--:--"} - ${jadwalShift?.jamSelesaiKerja != null ? DateFormat('HH:mm').format(jadwalShift!.jamSelesaiKerja!) : "--:--"}',
+                          : 'Shift Mengajar: ${jadwalShift?.jamMulaiKerja != null ? DateFormat('HH:mm').format(jadwalShift!.jamMulaiKerja) : "--:--"} - ${jadwalShift?.jamSelesaiKerja != null ? DateFormat('HH:mm').format(jadwalShift!.jamSelesaiKerja) : "--:--"}',
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 12.5,

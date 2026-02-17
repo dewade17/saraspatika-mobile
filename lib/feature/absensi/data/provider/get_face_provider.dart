@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_null_comparison
+
 import 'package:flutter/foundation.dart';
 import 'package:saraspatika/core/services/api_service.dart';
 import 'package:saraspatika/feature/absensi/data/dto/get_face.dart';
