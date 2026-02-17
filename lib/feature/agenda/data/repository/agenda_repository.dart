@@ -8,8 +8,15 @@ class AgendaRepository {
 
   final ApiService _api;
 
-  Future<List<Agenda>> fetchAgendaList() async {
-    final response = await _api.get(Endpoints.agenda, useToken: true);
+  Future<List<Agenda>> fetchAgendaList({String? userId}) async {
+    final response = await _api.get(
+      Endpoints.agenda,
+      queryParameters: {
+        if (userId != null && userId.trim().isNotEmpty)
+          'id_user': userId.trim(),
+      },
+      useToken: true,
+    );
     return _parseList(response);
   }
 

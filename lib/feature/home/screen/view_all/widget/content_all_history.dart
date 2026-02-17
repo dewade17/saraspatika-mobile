@@ -85,12 +85,23 @@ class _ContentAllHistoryState extends State<ContentAllHistory> {
         else if (filteredHistory.isEmpty)
           Padding(
             padding: const EdgeInsets.all(20),
-            child: Text(
-              _selectedDate == null
-                  ? "Tidak ada data absensi pada bulan ini."
-                  : "Tidak ada data absensi pada tanggal ${DateFormat('dd MMMM yyyy', 'id_ID').format(_selectedDate!)}.",
-              style: const TextStyle(color: Colors.grey),
-              textAlign: TextAlign.center,
+            child: Column(
+              children: [
+                Opacity(
+                  opacity: 0.5,
+                  child: Image.asset(
+                    'lib/assets/images/Profile-empty.png',
+                    width: 200,
+                  ),
+                ),
+                Text(
+                  _selectedDate == null
+                      ? "Tidak ada data absensi pada bulan ini."
+                      : "Tidak ada data absensi pada tanggal ${DateFormat('dd MMMM yyyy', 'id_ID').format(_selectedDate!)}.",
+                  style: const TextStyle(color: Colors.grey),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           )
         else

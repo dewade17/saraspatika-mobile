@@ -104,7 +104,11 @@ class _IzinSakitCutiState extends State<IzinSakitCuti> {
         return Scaffold(
           appBar: AppBar(
             centerTitle: true,
-            title: const Text('Cuti/Izin/Sakit'),
+            foregroundColor: AppColors.backgroundColor,
+            title: const Text(
+              'Izin, Cuti & Sakit',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
             backgroundColor: AppColors.primaryColor,
           ),
           body: provider.isLoading

@@ -131,7 +131,13 @@ class _HomeScreenContentState extends State<HomeScreenContent> {
   Widget build(BuildContext context) {
     final profileProvider = context.watch<UserProfileProvider>();
     final user = profileProvider.selectedUser;
-    final bool isProfileComplete = user?.isProfileComplete ?? false;
+
+    final bool isProfileComplete =
+        user != null &&
+        (user.name.isNotEmpty) &&
+        (user.email.isNotEmpty) &&
+        (user.nomorHandphone?.isNotEmpty ?? false);
+
     return Scaffold(
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(300),

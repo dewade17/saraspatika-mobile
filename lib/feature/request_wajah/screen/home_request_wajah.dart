@@ -218,23 +218,21 @@ class _HomeRequestWajahState extends State<HomeRequestWajah> {
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
+        foregroundColor: AppColors.backgroundColor,
         backgroundColor: AppColors.primaryColor,
-        surfaceTintColor: Colors.transparent,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.blue),
         title: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: const [
-            Icon(Icons.face_retouching_natural, color: Colors.blue),
+            Icon(Icons.face_retouching_natural),
             SizedBox(width: 8),
             Text(
               'Identifikasi Wajah',
               style: TextStyle(
-                color: Colors.black87,
                 fontFamily: 'Poppins',
                 fontSize: 20,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
@@ -483,17 +481,24 @@ class _HomeRequestWajahState extends State<HomeRequestWajah> {
                               horizontal: 16,
                               vertical: 16,
                             ),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                            child: const Center(
-                              child: Text(
-                                "Belum ada pengajuan ulang wajah",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.black54,
-                                ),
+                            child: Center(
+                              child: Column(
+                                children: [
+                                  Opacity(
+                                    opacity: 0.5,
+                                    child: Image.asset(
+                                      'lib/assets/images/Profile-empty.png',
+                                      width: 200,
+                                    ),
+                                  ),
+                                  Text(
+                                    "Belum ada pengajuan ulang wajah",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -508,6 +513,8 @@ class _HomeRequestWajahState extends State<HomeRequestWajah> {
       ),
       floatingActionButton: (!isLoading && hasFace)
           ? FloatingActionButton(
+              foregroundColor: AppColors.backgroundColor,
+              backgroundColor: AppColors.primaryColor,
               heroTag: null,
               onPressed: _openRequestReset,
               child: const Icon(Icons.add_circle),

@@ -157,7 +157,10 @@ class _RequestResetWajahScreenState extends State<RequestResetWajahScreen> {
                                   ),
                                   child: const Text(
                                     "Kirim Pengajuan",
-                                    style: TextStyle(fontSize: 16),
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: AppColors.backgroundColor,
+                                    ),
                                   ),
                                 ),
                         ],

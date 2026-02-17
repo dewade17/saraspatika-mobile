@@ -25,12 +25,17 @@ class _ButtonAppBarState extends State<ButtonAppBar> {
         : Icons.assignment_add;
     final String menuTitle = isKerja ? 'Agenda\nKerja' : 'Agenda\nMengajar';
     const String routeName = '/screen-agenda';
-    final bool isProfileComplete = user?.isProfileComplete ?? false;
+
+    final bool canAccessMenu =
+        user != null &&
+        (user.name.isNotEmpty) &&
+        (user.email.isNotEmpty) &&
+        (user.nomorHandphone?.isNotEmpty ?? false);
 
     return Column(
       children: [
         Card(
-          child: isProfileComplete
+          child: canAccessMenu
               ? Column(
                   children: [
                     const SizedBox(height: 10),

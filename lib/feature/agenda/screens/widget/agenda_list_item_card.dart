@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:saraspatika/core/constants/colors.dart';
 import 'package:saraspatika/feature/agenda/data/dto/agenda.dart';
 
 class AgendaListItemCard extends StatelessWidget {
@@ -21,25 +22,18 @@ class AgendaListItemCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Icon(
-                Icons.check_circle,
-                size: 40,
-                color: Theme.of(context).primaryColor,
-              ),
+              Icon(Icons.check_circle, size: 40, color: AppColors.primaryColor),
               const SizedBox(width: 16),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    DateFormat(
-                      'dd MMM yyyy',
-                      'id_ID',
-                    ).format(agenda.tanggal.toLocal()),
+                    DateFormat('dd MMM yyyy', 'id_ID').format(agenda.tanggal),
                     style: const TextStyle(fontSize: 16),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${DateFormat('HH:mm', 'id_ID').format(agenda.jamMulai.toLocal())} - ${DateFormat('HH:mm', 'id_ID').format(agenda.jamSelesai.toLocal())}',
+                    '${DateFormat('HH:mm', 'id_ID').format(agenda.jamMulai)} - ${DateFormat('HH:mm', 'id_ID').format(agenda.jamSelesai)}',
                     style: const TextStyle(fontSize: 15, color: Colors.grey),
                   ),
                 ],

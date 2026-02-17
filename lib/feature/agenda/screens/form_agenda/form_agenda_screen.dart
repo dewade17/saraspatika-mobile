@@ -1,21 +1,22 @@
-// ignore_for_file: avoid_print, deprecated_member_use
-
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:saraspatika/core/constants/colors.dart';
 import 'package:saraspatika/core/shared_widgets/app_button_widget.dart';
 import 'package:saraspatika/core/shared_widgets/app_picked_file.dart';
 import 'package:saraspatika/core/shared_widgets/app_text_field.dart';
 import 'package:saraspatika/core/utils/image_compress_utils.dart';
+import 'package:saraspatika/feature/agenda/data/dto/agenda.dart';
 import 'package:saraspatika/feature/agenda/data/provider/agenda_provider.dart';
 import 'package:saraspatika/feature/login/data/provider/auth_provider.dart';
-import 'package:file_picker/file_picker.dart';
 
 class FormAgendaScreen extends StatefulWidget {
-  const FormAgendaScreen({super.key});
+  const FormAgendaScreen({super.key, this.agenda});
+
+  final Agenda? agenda;
 
   @override
   State<FormAgendaScreen> createState() => _FormAgendaScreenState();
@@ -34,6 +35,28 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
   TimeOfDay? _jamSelesai;
 
   AppPickedFile? _pickedFile;
+
+  bool get _isEditMode => widget.agenda != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeFormForEdit();
+  }
+
+  void _initializeFormForEdit() {
+    final agenda = widget.agenda;
+    if (agenda == null) return;
+
+    _deskripsiController.text = agenda.deskripsi;
+    _tanggal = agenda.tanggal;
+    _jamMulai = TimeOfDay.fromDateTime(agenda.jamMulai);
+    _jamSelesai = TimeOfDay.fromDateTime(agenda.jamSelesai);
+
+    _tanggalController.text = DateFormat('yyyy-MM-dd').format(_tanggal!);
+    _jamMulaiController.text = DateFormat('HH:mm').format(agenda.jamMulai);
+    _jamSelesaiController.text = DateFormat('HH:mm').format(agenda.jamSelesai);
+  }
 
   @override
   void dispose() {
@@ -163,14 +186,22 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
     });
   }
 
+  Future<void> _launchURL(String urlString) async {
+    final uri = Uri.tryParse(urlString);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   Future<void> _submitForm() async {
     final isValid = _formKey.currentState?.validate() ?? false;
+    final shouldRequireProof = !_isEditMode;
 
     if (!isValid ||
         _tanggal == null ||
         _jamMulai == null ||
         _jamSelesai == null ||
-        _pickedFile == null) {
+        (shouldRequireProof && _pickedFile == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Mohon lengkapi semua field dan pilih bukti.'),
@@ -187,7 +218,6 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
       _jamMulai!.hour,
       _jamMulai!.minute,
     );
-
     final endDateTime = DateTime(
       _tanggal!.year,
       _tanggal!.month,
@@ -209,17 +239,34 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
     final provider = context.read<AgendaProvider>();
 
     try {
-      await provider.createAgenda(
-        deskripsi: _deskripsiController.text,
-        tanggal: _tanggalController.text,
-        jamMulai: _jamMulaiController.text,
-        jamSelesai: _jamSelesaiController.text,
-        buktiPendukung: _pickedFile,
-      );
+      if (_isEditMode) {
+        await provider.updateAgenda(
+          widget.agenda!.idAgenda,
+          deskripsi: _deskripsiController.text,
+          tanggal: _tanggalController.text,
+          jamMulai: _jamMulaiController.text,
+          jamSelesai: _jamSelesaiController.text,
+          buktiPendukung: _pickedFile,
+        );
+      } else {
+        await provider.createAgenda(
+          deskripsi: _deskripsiController.text,
+          tanggal: _tanggalController.text,
+          jamMulai: _jamMulaiController.text,
+          jamSelesai: _jamSelesaiController.text,
+          buktiPendukung: _pickedFile,
+        );
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Agenda berhasil disimpan.')),
+        SnackBar(
+          content: Text(
+            _isEditMode
+                ? 'Agenda berhasil diperbarui.'
+                : 'Agenda berhasil disimpan.',
+          ),
+        ),
       );
       Navigator.pop(context, true);
     } catch (_) {
@@ -264,7 +311,9 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
                       children: [
                         Center(
                           child: Text(
-                            'Form Agenda $labelSuffix',
+                            _isEditMode
+                                ? 'Edit Agenda $labelSuffix'
+                                : 'Form Agenda $labelSuffix',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 22,
@@ -341,10 +390,30 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
                                       : 'Upload Bukti Foto/File',
                                   borderRadius: 12,
                                 ),
+                                if (_isEditMode &&
+                                    _pickedFile == null &&
+                                    widget.agenda?.buktiPendukungUrl != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 12),
+                                    child: _buildExistingBuktiPreview(),
+                                  ),
                                 if (_pickedFile != null)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 12),
                                     child: _buildFilePreview(),
+                                  ),
+                                if (_isEditMode &&
+                                    _pickedFile == null &&
+                                    widget.agenda?.buktiPendukungUrl != null)
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 8),
+                                    child: Text(
+                                      'Bukti lama tetap digunakan jika Anda tidak memilih file baru.',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.black54,
+                                      ),
+                                    ),
                                   ),
                                 const SizedBox(height: 32),
                                 AppButton(
@@ -364,7 +433,9 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
                                       : const Icon(Icons.save),
                                   text: isLoading
                                       ? 'Menyimpan...'
-                                      : 'Simpan Agenda',
+                                      : (_isEditMode
+                                            ? 'Perbarui Agenda'
+                                            : 'Simpan Agenda'),
                                   borderRadius: 12,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 20,
@@ -387,6 +458,36 @@ class _FormAgendaScreenState extends State<FormAgendaScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildExistingBuktiPreview() {
+    final url = widget.agenda!.buktiPendukungUrl!;
+    final kind = agendaBuktiKindFromUrl(url);
+
+    if (kind == AgendaBuktiKind.image) {
+      return Card(
+        margin: EdgeInsets.zero,
+        color: Colors.blue[50],
+        child: ListTile(
+          leading: const Icon(Icons.image, color: Colors.blue),
+          title: const Text('Bukti Gambar (Lama)'),
+          subtitle: const Text('Klik untuk melihat gambar'),
+          onTap: () => _launchURL(url),
+        ),
+      );
+    } else if (kind == AgendaBuktiKind.pdf) {
+      return Card(
+        margin: EdgeInsets.zero,
+        color: Colors.red[50],
+        child: ListTile(
+          leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
+          title: const Text('Bukti PDF (Lama)'),
+          subtitle: const Text('Klik untuk melihat'),
+          onTap: () => _launchURL(url),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   Widget _buildFilePreview() {

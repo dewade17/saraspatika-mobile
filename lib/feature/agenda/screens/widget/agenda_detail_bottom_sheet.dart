@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:saraspatika/feature/agenda/data/dto/agenda.dart';
+import 'package:saraspatika/feature/agenda/data/provider/agenda_provider.dart';
+import 'package:saraspatika/feature/agenda/screens/form_agenda/form_agenda_screen.dart';
 import 'package:saraspatika/feature/agenda/screens/widget/agenda_action_buttons.dart';
 import 'package:saraspatika/feature/agenda/screens/widget/agenda_bukti_preview.dart';
 import 'package:saraspatika/feature/agenda/screens/widget/agenda_info_row.dart';
@@ -63,27 +66,21 @@ class AgendaDetailBottomSheet extends StatelessWidget {
                 value: DateFormat(
                   'EEEE, dd MMMM yyyy',
                   'id_ID',
-                ).format(agenda.tanggal.toLocal()),
+                ).format(agenda.tanggal),
               ),
               const SizedBox(height: 8),
               AgendaInfoRow(
                 icon: Icons.access_time,
                 iconColor: Colors.indigo,
                 label: 'Jam Mulai',
-                value: DateFormat(
-                  'HH:mm',
-                  'id_ID',
-                ).format(agenda.jamMulai.toLocal()),
+                value: DateFormat('HH:mm', 'id_ID').format(agenda.jamMulai),
               ),
               const SizedBox(height: 8),
               AgendaInfoRow(
                 icon: Icons.access_time_filled,
                 iconColor: Colors.indigo,
                 label: 'Jam Selesai',
-                value: DateFormat(
-                  'HH:mm',
-                  'id_ID',
-                ).format(agenda.jamSelesai.toLocal()),
+                value: DateFormat('HH:mm', 'id_ID').format(agenda.jamSelesai),
               ),
               const SizedBox(height: 8),
               Column(
@@ -118,17 +115,69 @@ class AgendaDetailBottomSheet extends StatelessWidget {
               AgendaBuktiPreview(buktiPendukungUrl: agenda.buktiPendukungUrl),
               const SizedBox(height: 24),
               AgendaActionButtons(
-                onEdit: () {
-                  Navigator.pop(context);
-                },
-                onDelete: () {
-                  Navigator.pop(context);
-                },
+                onEdit: () => _handleEdit(context),
+                onDelete: () => _handleDelete(context),
               ),
             ],
           ),
         );
       },
     );
+  }
+
+  Future<void> _handleEdit(BuildContext context) async {
+    Navigator.pop(context);
+
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => FormAgendaScreen(agenda: agenda)),
+    );
+  }
+
+  Future<void> _handleDelete(BuildContext context) async {
+    final shouldDelete =
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: const Text('Hapus Agenda'),
+              content: const Text('Yakin ingin menghapus agenda ini?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('Hapus'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+
+    if (!shouldDelete || !context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final provider = context.read<AgendaProvider>();
+
+    try {
+      await provider.deleteAgenda(agenda.idAgenda);
+      if (!context.mounted) return;
+      Navigator.pop(context);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Agenda berhasil dihapus.')),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(provider.errorMessage ?? 'Gagal menghapus agenda.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }

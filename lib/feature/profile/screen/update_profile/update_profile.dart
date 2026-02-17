@@ -10,11 +10,15 @@ class UpdateProfile extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: const Text('Perbarui Profil'),
-        backgroundColor: Colors.blue,
+        foregroundColor: AppColors.backgroundColor,
+        title: const Text(
+          'Perbarui Profil',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        backgroundColor: AppColors.primaryColor,
       ),
       body: Container(
-        color: AppColors.primaryColor,
+        color: AppColors.secondaryBackgroundColor,
         child: SafeArea(
           child: Stack(
             children: [

@@ -11,7 +11,7 @@ import 'package:saraspatika/core/utils/image_compress_utils.dart';
 import 'package:saraspatika/feature/izin_sakit_cuti/data/dto/pengajuan_absensi.dart';
 import 'package:saraspatika/feature/izin_sakit_cuti/data/provider/pengajuan_absensi_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart'; // Tambahkan ini
+import 'package:url_launcher/url_launcher.dart';
 
 class PengajuanScreen extends StatefulWidget {
   const PengajuanScreen({super.key, this.existingData});
@@ -224,7 +224,7 @@ class _PengajuanScreenState extends State<PengajuanScreen> {
                       child: const Padding(
                         padding: EdgeInsets.only(top: 30, left: 70, right: 70),
                         child: Text(
-                          'Form Permohonan Cuti/Izin/Sakit',
+                          'Form Permohonan Izin, Cuti & Sakit',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white,

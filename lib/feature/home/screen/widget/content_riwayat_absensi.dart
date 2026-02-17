@@ -62,10 +62,25 @@ class _ContentRiwayatAbsensiState extends State<ContentRiwayatAbsensi> {
             ),
           )
         else if (listHistory.isEmpty)
-          const Center(
+          Center(
             child: Padding(
               padding: EdgeInsets.all(20),
-              child: Text("Belum ada data absensi"),
+              child: Column(
+                children: [
+                  Opacity(
+                    opacity: 0.5,
+                    child: Image.asset(
+                      'lib/assets/images/Profile-empty.png',
+                      width: 200,
+                    ),
+                  ),
+                  Text(
+                    "Belum ada data absensi",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
             ),
           )
         else

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:saraspatika/core/constants/colors.dart';
 
 class AgendaActionButtons extends StatelessWidget {
   const AgendaActionButtons({
@@ -16,8 +17,11 @@ class AgendaActionButtons extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         ElevatedButton.icon(
-          icon: const Icon(Icons.edit),
-          label: const Text("Edit"),
+          icon: const Icon(Icons.edit, color: AppColors.backgroundColor),
+          label: const Text(
+            "Edit",
+            style: TextStyle(color: AppColors.backgroundColor),
+          ),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.blue,
             padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -28,8 +32,11 @@ class AgendaActionButtons extends StatelessWidget {
           onPressed: onEdit,
         ),
         ElevatedButton.icon(
-          icon: const Icon(Icons.delete),
-          label: const Text("Hapus"),
+          icon: const Icon(Icons.delete, color: AppColors.backgroundColor),
+          label: const Text(
+            "Hapus",
+            style: TextStyle(color: AppColors.backgroundColor),
+          ),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.red,
             padding: const EdgeInsets.symmetric(horizontal: 24),

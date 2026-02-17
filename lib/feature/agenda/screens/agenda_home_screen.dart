@@ -20,12 +20,12 @@ class _AgendaHomeScreenState extends State<AgendaHomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AgendaProvider>().fetchAgendaList();
+      context.read<AgendaProvider>().fetchAgendaListByCurrentUser();
     });
   }
 
   Future<void> _refreshAgenda() {
-    return context.read<AgendaProvider>().fetchAgendaList();
+    return context.read<AgendaProvider>().fetchAgendaListByCurrentUser();
   }
 
   @override
@@ -37,7 +37,11 @@ class _AgendaHomeScreenState extends State<AgendaHomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Agenda $titleSuffix'),
+        foregroundColor: AppColors.backgroundColor,
+        title: Text(
+          'Agenda $titleSuffix',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         centerTitle: true,
         backgroundColor: AppColors.primaryColor,
       ),
@@ -67,7 +71,25 @@ class _AgendaHomeScreenState extends State<AgendaHomeScreen> {
           }
 
           if (provider.agendaList.isEmpty) {
-            return const Center(child: Text('Belum ada agenda.'));
+            return Center(
+              child: Column(
+                children: [
+                  const SizedBox(height: 200),
+                  SizedBox(
+                    width: 200,
+                    height: 200,
+                    child: Opacity(
+                      opacity: 0.5,
+                      child: Image.asset(
+                        'lib/assets/images/Empty-data.png',
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  Text('Belum ada agenda.'),
+                ],
+              ),
+            );
           }
 
           return RefreshIndicator(

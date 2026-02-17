@@ -37,7 +37,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Future<_GuardDecision> _runGuard() async {
     final authProvider = context.read<AuthProvider>();
 
-    // Kalau sudah authenticated (mis. habis login), tidak perlu restore session lagi.
     if (!authProvider.isAuthenticated) {
       final restored = await authProvider.restoreSession();
       final isAuthenticated = restored && authProvider.isAuthenticated;
@@ -71,7 +70,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
       }
       return const _GuardDecision(_AuthNextRoute.home);
     } catch (e) {
-      // Kalau API return 404 saat data wajah belum ada, treat sebagai "belum ada data"
       if (e is ApiException && e.statusCode == 404) {
         return const _GuardDecision(_AuthNextRoute.registrasi);
       }
@@ -116,7 +114,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         final decision = snapshot.data;
 
-        // Fallback aman kalau future selesai tapi belum ada data
         if (decision == null) {
           return const LoginScreen();
         }
@@ -134,53 +131,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
             return _loadingScaffold();
 
           case _AuthNextRoute.error:
-            return Scaffold(
-              backgroundColor: AppColors.backgroundColor,
-              body: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.error_outline, size: 48),
-                      const SizedBox(height: 12),
-                      Text(
-                        decision.message ?? 'Terjadi kesalahan.',
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      Wrap(
-                        spacing: 12,
-                        children: [
-                          ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                _didRedirect = false;
-                                _guardFuture = _runGuard();
-                              });
-                            },
-                            child: const Text('Coba Lagi'),
-                          ),
-                          OutlinedButton(
-                            onPressed: () async {
-                              await context.read<AuthProvider>().logout();
-                              if (!mounted) return;
-                              setState(() {
-                                _didRedirect = false;
-                                _guardFuture = Future.value(
-                                  const _GuardDecision(_AuthNextRoute.login),
-                                );
-                              });
-                            },
-                            child: const Text('Ke Login'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
+            _redirectOnce('/login');
+            return _loadingScaffold();
         }
       },
     );

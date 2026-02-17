@@ -39,6 +39,26 @@ class AgendaProvider extends ChangeNotifier {
     }
   }
 
+  Future<List<Agenda>> fetchAgendaListByCurrentUser() async {
+    _setLoading(true);
+    _errorMessage = null;
+
+    try {
+      final userId = await getCurrentUserId();
+      final list = await _repository.fetchAgendaList(userId: userId);
+      _agendaList
+        ..clear()
+        ..addAll(list);
+      notifyListeners();
+      return agendaList;
+    } catch (e) {
+      _errorMessage = _friendlyError(e);
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   Future<Agenda> fetchAgendaById(String idAgenda) async {
     _setLoading(true);
     _errorMessage = null;
